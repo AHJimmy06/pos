@@ -11,6 +11,17 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response.data.data, // Extraemos el 'data' del envoltorio { success: true, data: ... }
   (error) => {
-    return Promise.reject(error.response?.data || error.message);
+    const responseData = error.response?.data;
+    // Handle structured error response { success: false, error: "..." }
+    if (responseData?.error) {
+      return Promise.reject(new Error(responseData.error));
+    }
+    // Handle NestJS validation error format { message: [...] }
+    if (responseData?.message) {
+      const msg = Array.isArray(responseData.message) ? responseData.message.join(', ') : responseData.message;
+      return Promise.reject(new Error(msg));
+    }
+    // Fallback
+    return Promise.reject(new Error(error.message || 'Error de conexión'));
   }
 );

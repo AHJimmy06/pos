@@ -178,24 +178,20 @@ export const InvoiceHistory: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                       <span className="font-black text-primary text-sm">{inv.total?.toString() || '$0.00'}</span>
-                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon-xs"
-                          onClick={(e) => { e.stopPropagation(); inv.id && handleViewInvoice(inv.id); }}
-                          title="Ver detalles"
-                        >
-                          <Eye className="size-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={(e) => { e.stopPropagation(); inv.id && handleViewInvoice(inv.id); }}
-                          title="Imprimir"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (inv.id) {
+                              setSelectedInvoice(inv);
+                              setIsModalOpen(true);
+                            }
+                          }}
+                          title="Ver / Imprimir"
                         >
                           <Printer className="size-3" />
                         </Button>
-                      </div>
                     </div>
                   </div>
                 ))}
