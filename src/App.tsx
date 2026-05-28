@@ -1,28 +1,107 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { POSPage } from './presentation/pages/POSPage';
+import { AuthProvider } from './presentation/context/AuthContext';
 import { ApplicationProvider } from './presentation/context/ApplicationContext';
-import { ShoppingCart } from 'lucide-react';
+import { ProtectedRoute } from './presentation/components/ProtectedRoute';
+import { DashboardLayout } from './presentation/components/DashboardLayout';
+
+// Páginas
+import { LoginPage } from './presentation/pages/LoginPage';
+import { DashboardPage } from './presentation/pages/DashboardPage';
+import { POSPage } from './presentation/pages/POSPage';
+import { ProductsPage } from './presentation/pages/ProductsPage';
+import { UsersPage } from './presentation/pages/UsersPage';
+
 import './index.css';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (
-    <ApplicationProvider>
-      <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-muted/20">
-          <nav className="bg-primary text-primary-foreground p-4 shadow-md mb-6">
-            <div className="container mx-auto flex items-center gap-2">
-              <ShoppingCart className="size-6" />
-              <h1 className="text-xl font-black tracking-tight uppercase">Gentleman POS</h1>
-            </div>
-          </nav>
-          <main className="container mx-auto px-4 pb-8">
-            <POSPage />
-          </main>
-        </div>
-      </QueryClientProvider>
-    </ApplicationProvider>
+    <AuthProvider>
+      <ApplicationProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <Routes>
+              {/* Ruta Pública: Login */}
+              <Route path="/login" element={<LoginPage />} />
+
+              {/* Rutas Privadas: Dashboard Layout */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* Redirección inicial según rol podría hacerse en un componente Home */}
+                <Route index element={<Navigate to="/pos" replace />} />
+                
+                <Route 
+                  path="dashboard" 
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route path="pos" element={<POSPage />} />
+                
+                <Route 
+                  path="products" 
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+                      <ProductsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="users" 
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+                      <UsersPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* Placeholders para las demás páginas */}
+                <Route path="clients" element={<div className="p-8 text-center font-bold">Página de Clientes (En desarrollo)</div>} />
+                <Route path="taxes" element={<div className="p-8 text-center font-bold">Página de Impuestos (En desarrollo)</div>} />
+                <Route path="settings" element={<div className="p-8 text-center font-bold">Configuración (En desarrollo)</div>} />
+              </Route>
+
+              {/* Ruta para No Autorizado */}
+              <Route path="/unauthorized" element={
+                <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+                  <h1 className="text-4xl font-black text-destructive uppercase">No Autorizado</h1>
+                  <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
+                  <button 
+                    onClick={() => window.location.href = '/'}
+                    className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg font-bold"
+                  >
+                    Volver al Inicio
+                  </button>
+                </div>
+              } />
+
+              {/* Fallback para 404 */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ApplicationProvider>
+    </AuthProvider>
   );
 }
 

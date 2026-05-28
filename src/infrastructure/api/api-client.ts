@@ -7,6 +7,18 @@ export const apiClient = axios.create({
   },
 });
 
+// Interceptor para inyectar el token de autenticación
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('pos_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor para manejar el formato de respuesta de NestJS que definiste
 apiClient.interceptors.response.use(
   (response) => response.data.data, // Extraemos el 'data' del envoltorio { success: true, data: ... }
