@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePOSStore } from "../store/usePOSStore";
 import { useInvoices } from "../hooks/usePOS";
@@ -34,6 +34,59 @@ interface CartSidebarProps {
 	onSuccess?: () => void;
 	onError?: (message: string) => void;
 }
+
+// PDF Modal que aparece automáticamente tras una venta exitosa
+const InvoicePrintModal: React.FC<{
+	invoice: ReturnType<typeof usePOSStore.getState>["currentInvoice"];
+	selectedClient: ReturnType<typeof usePOSStore.getState>["selectedClient"];
+	invoiceNumber: string;
+	onClose: () => void;
+}> = ({ invoice, selectedClient, invoiceNumber, onClose }) => {
+	const componentRef = useRef<HTMLDivElement>(null);
+	const handlePrint = useReactToPrint({
+		contentRef: componentRef,
+		documentTitle: `Factura_${invoiceNumber}`,
+	});
+
+	// Auto-print al montar
+	useEffect(() => {
+		handlePrint();
+	}, [handlePrint]);
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+			<div className="bg-background rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+				<div className="flex items-center justify-between p-4 border-b border-border">
+					<h2 className="font-black text-lg">Factura #{invoiceNumber}</h2>
+					<div className="flex gap-2">
+						<Button variant="outline" size="sm" onClick={handlePrint}>
+							Imprimir
+						</Button>
+						<Button variant="ghost" size="sm" onClick={onClose}>
+							Cerrar
+						</Button>
+					</div>
+				</div>
+				<div className="p-4">
+					<div className="hidden">
+						<InvoicePDF
+							ref={componentRef}
+							invoice={invoice!}
+							client={selectedClient!}
+							invoiceNumber={invoiceNumber}
+							/>
+					</div>
+					<InvoicePDF
+						ref={componentRef}
+						invoice={invoice!}
+						client={selectedClient!}
+						invoiceNumber={invoiceNumber}
+						/>
+				</div>
+			</div>
+		</div>
+	);
+};
 
 // Helper para formatear valores Money o números
 const formatMoney = (value: unknown): string => {
@@ -87,6 +140,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 	const { products } = useProducts();
 	const componentRef = useRef<HTMLDivElement>(null);
 
+	// Estado para el modal de impresión tras venta exitosa
+	const [printData, setPrintData] = useState<{
+		invoice: typeof currentInvoice;
+		client: typeof selectedClient;
+		number: string;
+	} | null>(null);
+
 	const nextInvoiceNumber =
 		invoices.length > 0
 			? Math.max(...invoices.map((i: { id?: number }) => i.id || 0)) + 1
@@ -139,6 +199,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 			await useCases.finalizeInvoice.execute(currentInvoice);
 			queryClient.invalidateQueries({ queryKey: ["products"] });
 			queryClient.invalidateQueries({ queryKey: ["invoices"] });
+			// Guardar datos para el modal de impresión antes de limpiar
+			setPrintData({
+				invoice: currentInvoice,
+				client: selectedClient,
+				number: formattedInvoiceNumber,
+			});
 			onSuccess?.();
 			clear();
 		} catch (e: unknown) {
@@ -363,5 +429,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 				</Button>
 			</CardFooter>
 		</Card>
-	);
+
+		{/* Modal de impresión automática tras venta exitosa */}
+		{printData && (
+			<InvoicePrintModal
+				invoice={printData.invoice}
+				client={printData.client}
+				invoiceNumber={printData.number}
+				onClose={() => setPrintData(null)}
+			/>
+		)}
+	</div>
+);
 };
