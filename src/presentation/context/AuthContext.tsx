@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/infrastructure/api/api-client';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
 export type UserRole = 'ADMINISTRATOR' | 'SELLER';
 
-interface User {
+export interface User {
   id: string;
   username: string;
   role: UserRole;
@@ -22,9 +21,22 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Initialize state directly from localStorage to avoid cascading renders
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('pos_user');
+    try {
+      return saved ? JSON.parse(saved) as User : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('pos_token');
+  });
+
+  // Since we initialize from localStorage, it's not "loading" from an async source
+  const [isLoading] = useState(false);
 
   const login = useCallback((newToken: string, newUser: User) => {
     setToken(newToken);
@@ -40,17 +52,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('pos_user');
   }, []);
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('pos_token');
-    const savedUser = localStorage.getItem('pos_user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
   const value = {
     user,
     token,
@@ -63,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -1,23 +1,24 @@
 import { Product } from '../../domain/entities/product.entity';
+import type { ProductResponseDto } from '../dto/api-response.dto';
 
 export class ProductMapper {
-  static toDomain(raw: any): Product {
+  static toDomain(raw: ProductResponseDto): Product {
     const product = new Product(
       raw.id,
-      raw._name?.value || raw.name || '',
-      Number(raw._price?.value || raw.price || 0),
-      raw._stock?.value ?? raw.stock ?? 0
+      raw.name || '',
+      Number(raw.price || 0),
+      raw.stock ?? 0
     );
     // Include taxIds from the API response
-    product.taxIds = raw.taxIds || raw.productTaxes?.map((pt: any) => pt.taxId) || [];
+    product.taxIds = raw.taxIds || [];
     return product;
   }
 
-  static toPersistence(product: Product): any {
+  static toPersistence(product: Product): Record<string, unknown> {
     return {
       name: product.name,
-      price: product.price.value,
-      stock: product.stock.value
+      price: product.price,
+      stock: product.stock
     };
   }
 }

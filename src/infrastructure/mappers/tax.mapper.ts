@@ -1,11 +1,12 @@
 import { Tax } from '../../domain/entities/tax.entity';
+import type { TaxResponseDto } from '../dto/api-response.dto';
 
 export class TaxMapper {
-  static toDomain(raw: any): Tax {
+  static toDomain(raw: TaxResponseDto): Tax {
     return new Tax(
       raw.id,
-      raw._name?.value || raw.name || '',
-      Number(raw._currentRate?.value || raw.currentRate || 0)
+      raw.name || '',
+      Number(raw.currentRate || 0)
     );
   }
 }

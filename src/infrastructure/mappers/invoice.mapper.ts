@@ -1,7 +1,8 @@
 import { Invoice, InvoiceDetail } from '../../domain/entities/invoice.entity';
+import type { InvoiceResponseDto, InvoiceDetailResponseDto, TaxSnapshotDto } from '../dto/api-response.dto';
 
 // Helper to extract number from various formats: { value: 123 } or 123 or "123"
-function extractNumber(val: any): number {
+function extractNumber(val: number | string | { value: number | string } | undefined): number {
   if (val === undefined || val === null) return 0;
   if (typeof val === 'number') return val;
   if (typeof val === 'string') return parseFloat(val) || 0;
@@ -10,29 +11,28 @@ function extractNumber(val: any): number {
 }
 
 export class InvoiceMapper {
-  static toDomain(raw: any): Invoice {
+  static toDomain(raw: InvoiceResponseDto): Invoice {
     const invoice = new Invoice(raw.clientId, raw.id);
     invoice.transactionId = raw.transactionId;
     invoice.issueDate = new Date(raw.issueDate);
 
     if (raw.details) {
-      raw.details.forEach((d: any) => {
+      raw.details.forEach((d: InvoiceDetailResponseDto) => {
         // Handle unitPrice from API - various formats:
-        // - _unitPriceSnapshot: { value: 129999 } from class-transformer
-        // - unitPriceSnapshot: plain number (legacy/raw Prisma)
-        const unitPriceRaw = d._unitPriceSnapshot?.value ?? d.unitPriceSnapshot ?? d.unitPrice;
-        const unitPriceInCents = extractNumber(unitPriceRaw);
+        // - unitPriceSnapshot: plain number (cents from API)
+        // - unitPrice: fallback
+        const unitPriceInCents = extractNumber(d.unitPriceSnapshot ?? d.unitPrice);
         // Prices are stored in cents, convert to decimal for display
         const unitPriceInDollars = unitPriceInCents / 100;
 
         const detail = new InvoiceDetail(
           d.productId,
-          d.productName || d.product?.name || 'Producto',
+          d.productName || 'Producto',
           d.quantity,
           unitPriceInDollars,
-          d.detailTaxes?.map((t: any) => ({
+          (d.detailTaxes || d.taxes || []).map((t: TaxSnapshotDto) => ({
             taxId: t.taxId,
-            rate: extractNumber(t.rateSnapshot) || extractNumber(t.rate) || 0
+            rate: t.rate
           }))
         );
         invoice.addDetail(detail);
@@ -42,7 +42,7 @@ export class InvoiceMapper {
     return invoice;
   }
 
-  static toPersistence(invoice: Invoice): any {
+  static toPersistence(invoice: Invoice): Record<string, unknown> {
     return {
       clientId: invoice.clientId,
       items: invoice.details.map(d => {

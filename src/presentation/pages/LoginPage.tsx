@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type UserRole } from '../context/AuthContext';
 import { apiClient } from '@/infrastructure/api/api-client';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ShoppingCart, LogIn, AlertCircle } from 'lucide-react';
+
+interface LoginResponse {
+  accessToken: string;
+  expiresIn: number;
+}
+
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+}
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,7 +28,8 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || '/';
+  const state = location.state as LocationState;
+  const from = state?.from?.pathname || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,35 +38,23 @@ export const LoginPage: React.FC = () => {
 
     try {
       // Llamada al endpoint de la API
-      const response = await apiClient.post('/auth/login', { email, password });
+      const response = await apiClient.post<unknown, LoginResponse>('/auth/login', { email, password });
       
-      // La respuesta del interceptor ya devuelve response.data.data
-      // Asumimos que la API devuelve { accessToken, user: { id, username, role, fullName } }
-      // Si la API solo devuelve el token, el interceptor o el backend debería proveer los datos del usuario.
-      // Basado en el controlador de NestJS: login() devuelve { accessToken: string; expiresIn: number }
-      // Nota: Si el backend no devuelve el usuario en el login, se necesita un endpoint /me
-      // Vamos a ajustar asumiendo que el accessToken es lo mínimo y simulamos o extraemos el user si es un JWT decodificado
+      const { accessToken } = response;
       
-      const { accessToken } = response as any;
-      
-      // En una app real, decodificaríamos el JWT o llamaríamos a /auth/me
-      // Para este prototipo, simulamos el user si el backend no lo da en la respuesta de login
-      // Pero idealmente el backend lo da. Vamos a ver si podemos obtenerlo.
-      
-      // Simulación de usuario basado en roles comunes para la demo si no viene en el body
-      // En pos-api, LoginCommand generalmente devuelve solo el token.
-      // Intentaremos obtener el usuario (esto es una simplificación, en producción usaríamos /me o decodificar JWT)
+      // Simulación de usuario basado en roles comunes para la demo
       const mockUser = {
         id: '1',
         username: email.split('@')[0],
-        role: email.includes('admin') ? 'ADMINISTRATOR' : 'SELLER' as any,
+        role: (email.includes('admin') ? 'ADMINISTRATOR' : 'SELLER') as UserRole,
         fullName: email.includes('admin') ? 'Administrador Sistema' : 'Vendedor Usuario'
       };
 
       login(accessToken, mockUser);
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err.message || 'Credenciales inválidas');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Credenciales inválidas';
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

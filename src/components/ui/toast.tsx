@@ -50,18 +50,3 @@ export function Toast({ message, type = 'success', duration = 4000, onClose }: T
     </div>
   );
 }
-
-// Hook para mostrar toasts
-export function useToast() {
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
-
-  const hideToast = () => {
-    setToast(null);
-  };
-
-  return { toast, showToast, hideToast };
-}

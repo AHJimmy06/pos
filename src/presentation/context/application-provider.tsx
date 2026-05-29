@@ -1,26 +1,12 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import { useMemo } from 'react';
+import { ApplicationContext } from './application-context';
 import * as repos from '../../infrastructure/repositories';
 import { AddItemToInvoiceUseCase } from '../../application/use-cases/add-item-to-invoice.use-case';
 import { UpdateItemQuantityUseCase } from '../../application/use-cases/update-item-quantity.use-case';
 import { RemoveItemFromInvoiceUseCase } from '../../application/use-cases/remove-item-from-invoice.use-case';
 import { FinalizeInvoiceUseCase } from '../../application/use-cases/finalize-invoice.use-case';
 
-interface ApplicationContextProps {
-  // Repositorios
-  repositories: typeof repos;
-  // Casos de Uso
-  useCases: {
-    addItem: AddItemToInvoiceUseCase;
-    updateQuantity: UpdateItemQuantityUseCase;
-    removeItem: RemoveItemFromInvoiceUseCase;
-    finalizeInvoice: FinalizeInvoiceUseCase;
-  };
-}
-
-const ApplicationContext = createContext<ApplicationContextProps | null>(null);
-
-export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Usamos useMemo para que las instancias se creen una sola vez
+export const ApplicationProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(() => ({
     repositories: repos,
     useCases: {
@@ -36,10 +22,4 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       {children}
     </ApplicationContext.Provider>
   );
-};
-
-export const useApplication = () => {
-  const context = useContext(ApplicationContext);
-  if (!context) throw new Error('useApplication debe usarse dentro de un ApplicationProvider');
-  return context;
 };

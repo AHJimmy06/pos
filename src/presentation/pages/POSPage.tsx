@@ -5,7 +5,8 @@ import { CartSidebar } from '../components/CartSidebar';
 import { InvoiceHistory } from '../components/InvoiceHistory';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Warehouse } from 'lucide-react';
-import { Toast, useToast } from '@/components/ui/toast';
+import { Toast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 
 export const POSPage: React.FC = () => {
   const { toast, showToast, hideToast } = useToast();

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head><title>Debug POS API</title></head>
+<body>
+<h2>POS API Response Test</h2>
+<pre id="output">Loading...</pre>
+<script type="module">
+import axios from 'https://cdn.jsdelivr.net/npm/axios@1/+esm';
+
+const api = axios.create({
+  baseURL: 'http://localhost:3001/api',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Interceptors
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('pos_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use((response) => {
+  const data = response.data;
+  console.log('Raw response.data:', data);
+  
+  if (data?.success === true && data?.data) {
+    const innerData = data.data;
+    console.log('innerData:', innerData);
+    
+    if (Array.isArray(innerData.data) && typeof innerData.total === 'number') {
+      console.log('✓ Returning paginated structure');
+      return innerData;
+    }
+    return innerData;
+  }
+  return data;
+}, (error) => Promise.reject(error));
+
+// Login and test
+const loginRes = await api.post('/auth/login', {
+  email: 'admin@gentleman.com',
+  password: 'Gentleman2026!'
+});
+console.log('Login result:', loginRes.data);
+
+const usersRes = await api.get('/users?page=1&limit=2');
+console.log('Users result:', JSON.stringify(usersRes));
+
+document.getElementById('output').textContent = JSON.stringify({
+  users: usersRes
+}, null, 2);
+</script>
+</body>
+</html>

@@ -1,23 +1,23 @@
 import { Client } from '../../domain/entities/client.entity';
+import type { ClientResponseDto } from '../dto/api-response.dto';
 
 export class ClientMapper {
-  static toDomain(raw: any): Client {
-    // Adaptamos el formato de Value Objects del API (_firstName.value)
+  static toDomain(raw: ClientResponseDto): Client {
     return new Client(
       raw.id,
-      raw._firstName?.value || raw.firstName || '',
-      raw._lastName?.value || raw.lastName || '',
-      raw._email?.value || raw.email || '',
+      raw.firstName || '',
+      raw.lastName || '',
+      raw.email || '',
       raw.phone || '',
       raw.address || ''
     );
   }
 
-  static toPersistence(client: Client): any {
+  static toPersistence(client: Client): Record<string, unknown> {
     return {
       firstName: client.firstName,
       lastName: client.lastName,
-      email: client.email.value, // Extraemos el valor primitivo
+      email: client.email,
       phone: client.phone,
       address: client.address
     };

@@ -54,8 +54,21 @@ export function DropdownSelector({
   const triggerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const searchTermRef = useRef(searchTerm);
 
   const PAGE_SIZE = 5;
+
+  // Update ref when search term changes
+  useEffect(() => {
+    searchTermRef.current = searchTerm;
+  }, [searchTerm]);
+
+  // Handle search change and reset pagination
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    // Reset page to 0 when search changes
+    setPage(0);
+  };
 
   const filteredOptions = options.filter(opt =>
     opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -70,10 +83,6 @@ export function DropdownSelector({
       searchInputRef.current.focus();
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm]);
 
   useEffect(() => {
     if (isOpen && triggerRef.current) {
@@ -215,7 +224,7 @@ export function DropdownSelector({
               type="text"
               placeholder={searchPlaceholder}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full text-sm py-1.5 px-3 rounded-lg border border-input bg-background outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>

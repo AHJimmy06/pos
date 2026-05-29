@@ -88,19 +88,24 @@ function InputGroupButton({
   type = "button",
   variant = "ghost",
   size = "xs",
-  ...props
-}: Omit<React.ComponentProps<typeof Button>, "size" | "type"> &
-  VariantProps<typeof inputGroupButtonVariants> & {
-    type?: "button" | "submit" | "reset"
-  }) {
+  children,
+}: {
+  className?: string;
+  type?: "button" | "submit" | "reset";
+  variant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
+  size?: "xs" | "sm" | "icon-xs" | "icon-sm";
+  children?: React.ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <Button
       type={type}
       data-size={size}
       variant={variant}
       className={cn(inputGroupButtonVariants({ size }), className)}
-      {...props}
-    />
+    >
+      {children}
+    </Button>
   )
 }
 
