@@ -68,20 +68,12 @@ const InvoicePrintModal: React.FC<{
 					</div>
 				</div>
 				<div className="p-4">
-					<div className="hidden">
-						<InvoicePDF
-							ref={componentRef}
-							invoice={invoice!}
-							client={selectedClient!}
-							invoiceNumber={invoiceNumber}
-							/>
-					</div>
 					<InvoicePDF
 						ref={componentRef}
 						invoice={invoice!}
 						client={selectedClient!}
 						invoiceNumber={invoiceNumber}
-						/>
+					/>
 				</div>
 			</div>
 		</div>
@@ -219,7 +211,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 	const invoiceTotal = currentInvoice?.total;
 
 	return (
-		<Card className="flex flex-col h-[calc(100vh-100px)] shadow-xl border-border/50 overflow-hidden">
+		<>
+			<Card className="flex flex-col h-[calc(100vh-100px)] shadow-xl border-border/50 overflow-hidden">
 			<div className="hidden">
 				{currentInvoice && selectedClient && (
 					<InvoicePDF
@@ -434,11 +427,11 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 		{printData && (
 			<InvoicePrintModal
 				invoice={printData.invoice}
-				client={printData.client}
+				selectedClient={printData.client}
 				invoiceNumber={printData.number}
 				onClose={() => setPrintData(null)}
 			/>
 		)}
-	</div>
+	</>
 );
 };
