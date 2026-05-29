@@ -9,7 +9,8 @@ import {
   LogOut, 
   LayoutDashboard,
   Percent,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,12 @@ const sidebarItems: SidebarItem[] = [
     title: 'Impuestos',
     path: '/taxes',
     icon: Percent,
+    roles: ['ADMINISTRATOR'],
+  },
+  {
+    title: 'Facturas',
+    path: '/invoices',
+    icon: FileText,
     roles: ['ADMINISTRATOR'],
   },
   {

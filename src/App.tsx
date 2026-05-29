@@ -13,6 +13,7 @@ import { ProductsPage } from "./presentation/pages/ProductsPage";
 import { UsersPage } from "./presentation/pages/UsersPage";
 import { ClientsPage } from "./presentation/pages/ClientsPage";
 import { TaxesPage } from "./presentation/pages/TaxesPage";
+import { InvoicesPage } from "./presentation/pages/InvoicesPage";
 
 import "./index.css";
 
@@ -76,7 +77,8 @@ function App() {
 									}
 								/>
 
-								<Route path="clients" element={<ClientsPage />} />
+<Route path="clients" element={<ClientsPage />} />
+								<Route path="invoices" element={<InvoicesPage />} />
 								<Route path="taxes" element={<TaxesPage />} />
 								<Route
 									path="settings"
