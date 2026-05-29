@@ -22,6 +22,26 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
+// Helper para extraer payload de respuestas NestJS
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPayload<T>(response: any): T | null {
+	const data = response?.data;
+	if (!data) return null;
+	if (data.success !== undefined && data.data !== undefined) {
+		const inner = data.data;
+		if (
+			inner &&
+			typeof inner === "object" &&
+			"data" in inner &&
+			"total" in inner
+		) {
+			return inner as T;
+		}
+		return inner as T;
+	}
+	return data as T;
+}
+
 interface UseTaxesResult {
 	taxes: Tax[];
 	total: number;
@@ -50,13 +70,12 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 			if (search) {
 				params.append("search", search);
 			}
-			// El interceptor devuelve { data: [...], total: N }
 			const response = await apiClient.get(`/taxes?${params}`);
-			return response as unknown as PaginatedResponse<Tax>;
+			const payload = getPayload<PaginatedResponse<Tax>>(response);
+			return payload ?? { data: [], total: 0 };
 		},
 	});
 
-	// El interceptor retorna directamente { data: [...], total: N }
 	const result = taxesQuery.data as PaginatedResponse<Tax> | undefined;
 	const taxes = result?.data ?? [];
 	const total = result?.total ?? 0;
@@ -64,7 +83,9 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateTaxDto): Promise<Tax> => {
 			const response = await apiClient.post("/taxes", data);
-			return response as unknown as Tax;
+			const payload = getPayload<Tax>(response);
+			if (!payload) throw new Error("Error al crear impuesto");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["taxes"] });
@@ -80,7 +101,9 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 			data: UpdateTaxDto;
 		}): Promise<Tax> => {
 			const response = await apiClient.put(`/taxes/${id}`, data);
-			return response as unknown as Tax;
+			const payload = getPayload<Tax>(response);
+			if (!payload) throw new Error("Error al actualizar impuesto");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["taxes"] });

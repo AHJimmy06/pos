@@ -29,6 +29,26 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
+// Helper para extraer payload de respuestas NestJS
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPayload<T>(response: any): T | null {
+	const data = response?.data;
+	if (!data) return null;
+	if (data.success !== undefined && data.data !== undefined) {
+		const inner = data.data;
+		if (
+			inner &&
+			typeof inner === "object" &&
+			"data" in inner &&
+			"total" in inner
+		) {
+			return inner as T;
+		}
+		return inner as T;
+	}
+	return data as T;
+}
+
 interface UseProductsResult {
 	products: Product[];
 	total: number;
@@ -62,7 +82,8 @@ export const useProducts = (
 				params.append("search", search);
 			}
 			const response = await apiClient.get(`/products?${params}`);
-			return response as unknown as PaginatedResponse<Product>;
+			const payload = getPayload<PaginatedResponse<Product>>(response);
+			return payload ?? { data: [], total: 0 };
 		},
 	});
 
@@ -73,7 +94,9 @@ export const useProducts = (
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateProductDto): Promise<Product> => {
 			const response = await apiClient.post("/products", data);
-			return response as unknown as Product;
+			const payload = getPayload<Product>(response);
+			if (!payload) throw new Error("Error al crear producto");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -89,7 +112,9 @@ export const useProducts = (
 			data: UpdateProductDto;
 		}): Promise<Product> => {
 			const response = await apiClient.put(`/products/${id}`, data);
-			return response as unknown as Product;
+			const payload = getPayload<Product>(response);
+			if (!payload) throw new Error("Error al actualizar producto");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });

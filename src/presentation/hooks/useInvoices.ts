@@ -99,6 +99,33 @@ export const useInvoices = (
 ): UseInvoicesResult => {
 	const queryClient = useQueryClient();
 
+	// Helper para extraer payload de respuestas NestJS
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	function getPayload<T>(response: any): T | null {
+		const data = response?.data;
+
+		if (!data) return null;
+
+		// Si tiene estructura NestJS wrapper { success, data: ... }
+		if (data.success !== undefined && data.data !== undefined) {
+			const inner = data.data;
+			// Si es paginado
+			if (
+				inner &&
+				typeof inner === "object" &&
+				"data" in inner &&
+				"total" in inner
+			) {
+				return inner as T;
+			}
+			// Si es simple
+			return inner as T;
+		}
+
+		// Si no tiene wrapper
+		return data as T;
+	}
+
 	const invoicesQuery = useQuery({
 		queryKey: ["invoices", { page, limit, searchId }],
 		queryFn: async () => {
@@ -110,7 +137,8 @@ export const useInvoices = (
 				params.append("searchId", String(searchId));
 			}
 			const response = await apiClient.get(`/invoices?${params}`);
-			const raw = response as unknown as PaginatedResponse<RawInvoice>;
+			const raw = getPayload<PaginatedResponse<RawInvoice>>(response);
+			if (!raw) return { data: [], total: 0 };
 			return {
 				data: (raw.data ?? []).map((inv) => ({
 					...inv,

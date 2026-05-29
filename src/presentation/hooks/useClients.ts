@@ -29,6 +29,34 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
+// Helper para extraer payload de respuestas NestJS
+function getPayload<T>(response: unknown): T | null {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const res = response as any;
+	const data = res?.data;
+
+	if (!data) return null;
+
+	// Si tiene estructura NestJS wrapper { success, data: ... }
+	if (data.success !== undefined && data.data !== undefined) {
+		const inner = data.data;
+		// Si es paginado
+		if (
+			inner &&
+			typeof inner === "object" &&
+			"data" in inner &&
+			"total" in inner
+		) {
+			return inner as T;
+		}
+		// Si es simple
+		return inner as T;
+	}
+
+	// Si no tiene wrapper
+	return data as T;
+}
+
 interface UseClientsResult {
 	clients: Client[];
 	total: number;
@@ -62,14 +90,21 @@ export const useClients = (
 				params.append("search", search);
 			}
 			const response = await apiClient.get(`/clients?${params}`);
-			return response as unknown as PaginatedResponse<Client>;
+			return (
+				getPayload<PaginatedResponse<Client>>(response) ?? {
+					data: [],
+					total: 0,
+				}
+			);
 		},
 	});
 
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateClientDto): Promise<Client> => {
 			const response = await apiClient.post("/clients", data);
-			return response as unknown as Client;
+			const payload = getPayload<Client>(response);
+			if (!payload) throw new Error("Error al crear cliente");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -85,7 +120,9 @@ export const useClients = (
 			data: UpdateClientDto;
 		}): Promise<Client> => {
 			const response = await apiClient.put(`/clients/${id}`, data);
-			return response as unknown as Client;
+			const payload = getPayload<Client>(response);
+			if (!payload) throw new Error("Error al actualizar cliente");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });
