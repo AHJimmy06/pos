@@ -7,6 +7,8 @@ export interface InvoiceDetail {
 	quantity: number;
 	unitPriceSnapshot: number;
 	subtotal: number;
+	taxRate: number;
+	taxName: string;
 }
 
 export interface Invoice {
@@ -21,6 +23,49 @@ export interface Invoice {
 	status: "DRAFT" | "CONFIRMED" | "CANCELLED";
 	paymentMethod: string;
 	details: InvoiceDetail[];
+}
+
+interface RawInvoiceDetail {
+	productId: number;
+	productName: string;
+	quantity: number;
+	// Backend serializa campos privados con _
+	_unitPriceSnapshot?: { value: number };
+	unitPriceSnapshot?: number;
+	subtotal?: number;
+	detailTaxes?: { taxName: string; taxRate: number }[];
+}
+
+interface RawInvoice {
+	id: number;
+	clientId: number;
+	userId?: number;
+	issueDate: string;
+	subtotalSnapshot: number;
+	taxTotalSnapshot: number;
+	totalSnapshot: number;
+	transactionId?: string;
+	status: "DRAFT" | "CONFIRMED" | "CANCELLED";
+	paymentMethod: string;
+	details: RawInvoiceDetail[];
+}
+
+function mapDetail(raw: RawInvoiceDetail): InvoiceDetail {
+	const unitPrice =
+		raw.unitPriceSnapshot ?? raw._unitPriceSnapshot?.value ?? 0;
+	const subtotal = raw.subtotal ?? unitPrice * raw.quantity;
+	const taxes = raw.detailTaxes ?? [];
+	// Si no hay impuestos, asumimos 0% IVA
+	const mainTax = taxes[0];
+	return {
+		productId: raw.productId,
+		productName: raw.productName,
+		quantity: raw.quantity,
+		unitPriceSnapshot: unitPrice,
+		subtotal,
+		taxRate: mainTax?.taxRate ?? 0,
+		taxName: mainTax?.taxName ?? "IVA",
+	};
 }
 
 export interface CreateInvoiceDto {
@@ -58,16 +103,23 @@ export const useInvoices = (
 	const invoicesQuery = useQuery({
 		queryKey: ["invoices", { page, limit, searchId }],
 		queryFn: async () => {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-			});
-			if (searchId) {
-				params.append("searchId", String(searchId));
-			}
-			const response = await apiClient.get(`/invoices?${params}`);
-			return response as unknown as PaginatedResponse<Invoice>;
-		},
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+      if (searchId) {
+        params.append("searchId", String(searchId));
+      }
+      const response = await apiClient.get(`/invoices?${params}`);
+      const raw = response as unknown as PaginatedResponse<RawInvoice>;
+      return {
+        data: (raw.data ?? []).map((inv) => ({
+          ...inv,
+          details: inv.details.map(mapDetail),
+        })),
+        total: raw.total ?? 0,
+      } as PaginatedResponse<Invoice>;
+    },
 	});
 
 	const result = invoicesQuery.data as PaginatedResponse<Invoice> | undefined;

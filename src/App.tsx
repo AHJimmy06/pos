@@ -77,7 +77,7 @@ function App() {
 									}
 								/>
 
-<Route path="clients" element={<ClientsPage />} />
+								<Route path="clients" element={<ClientsPage />} />
 								<Route path="invoices" element={<InvoicesPage />} />
 								<Route path="taxes" element={<TaxesPage />} />
 								<Route
