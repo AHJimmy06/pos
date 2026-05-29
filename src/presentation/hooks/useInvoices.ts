@@ -51,8 +51,7 @@ interface RawInvoice {
 }
 
 function mapDetail(raw: RawInvoiceDetail): InvoiceDetail {
-	const unitPrice =
-		raw.unitPriceSnapshot ?? raw._unitPriceSnapshot?.value ?? 0;
+	const unitPrice = raw.unitPriceSnapshot ?? raw._unitPriceSnapshot?.value ?? 0;
 	const subtotal = raw.subtotal ?? unitPrice * raw.quantity;
 	const taxes = raw.detailTaxes ?? [];
 	// Si no hay impuestos, asumimos 0% IVA
@@ -103,23 +102,23 @@ export const useInvoices = (
 	const invoicesQuery = useQuery({
 		queryKey: ["invoices", { page, limit, searchId }],
 		queryFn: async () => {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-      });
-      if (searchId) {
-        params.append("searchId", String(searchId));
-      }
-      const response = await apiClient.get(`/invoices?${params}`);
-      const raw = response as unknown as PaginatedResponse<RawInvoice>;
-      return {
-        data: (raw.data ?? []).map((inv) => ({
-          ...inv,
-          details: inv.details.map(mapDetail),
-        })),
-        total: raw.total ?? 0,
-      } as PaginatedResponse<Invoice>;
-    },
+			const params = new URLSearchParams({
+				page: String(page),
+				limit: String(limit),
+			});
+			if (searchId) {
+				params.append("searchId", String(searchId));
+			}
+			const response = await apiClient.get(`/invoices?${params}`);
+			const raw = response as unknown as PaginatedResponse<RawInvoice>;
+			return {
+				data: (raw.data ?? []).map((inv) => ({
+					...inv,
+					details: inv.details.map(mapDetail),
+				})),
+				total: raw.total ?? 0,
+			} as PaginatedResponse<Invoice>;
+		},
 	});
 
 	const result = invoicesQuery.data as PaginatedResponse<Invoice> | undefined;

@@ -350,8 +350,8 @@ export const InvoicesPage: React.FC = () => {
 			</Card>
 
 			{/* Invoice Details Dialog */}
-			<Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-				<DialogContent className="max-w-2xl">
+<Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+				<DialogContent className="max-w-4xl">
 					<DialogHeader>
 						<DialogTitle>Factura #{selectedInvoice?.id}</DialogTitle>
 					</DialogHeader>
@@ -392,33 +392,55 @@ export const InvoicesPage: React.FC = () => {
 									<table className="w-full text-sm">
 										<thead className="bg-muted/30">
 											<tr>
-												<th className="px-4 py-2 text-left font-black text-xs">Producto</th>
-												<th className="px-4 py-2 text-right font-black text-xs">Cant.</th>
-												<th className="px-4 py-2 text-right font-black text-xs">Precio Unit.</th>
-												<th className="px-4 py-2 text-right font-black text-xs">IVA {selectedInvoice && selectedInvoice.details[0]?.taxRate > 0 ? `(${selectedInvoice.details[0].taxRate}%)` : ''}</th>
-												<th className="px-4 py-2 text-right font-black text-xs">Subtotal</th>
+												<th className="px-4 py-2 text-left font-black text-xs">
+													Producto
+												</th>
+												<th className="px-4 py-2 text-right font-black text-xs">
+													Cant.
+												</th>
+												<th className="px-4 py-2 text-right font-black text-xs">
+													Precio Unit.
+												</th>
+												<th className="px-4 py-2 text-right font-black text-xs">
+													IVA{" "}
+													{selectedInvoice &&
+													selectedInvoice.details[0]?.taxRate > 0
+														? `(${selectedInvoice.details[0].taxRate}%)`
+														: ""}
+												</th>
+												<th className="px-4 py-2 text-right font-black text-xs">
+													Subtotal
+												</th>
 											</tr>
 										</thead>
 										<tbody className="divide-y divide-border/50">
-                      {selectedInvoice.details?.map((detail, idx) => {
-                        const iva = detail.taxRate > 0
-                          ? (detail.subtotal * detail.taxRate / (100 + detail.taxRate))
-                          : 0;
-                        return (
-                          <tr key={idx}>
-                            <td className="px-4 py-2">{detail.productName}</td>
-                            <td className="px-4 py-2 text-right">{detail.quantity}</td>
-                            <td className="px-4 py-2 text-right">{formatCurrency(detail.unitPriceSnapshot)}</td>
-                            <td className="px-4 py-2 text-right text-muted-foreground">
-                              {detail.taxRate > 0
-                                ? `${formatCurrency(iva)} (${detail.taxRate}%)`
-                                : '-'}
-                            </td>
-                            <td className="px-4 py-2 text-right font-medium">{formatCurrency(detail.subtotal)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
+											{selectedInvoice.details?.map((detail, idx) => {
+												const iva =
+													detail.taxRate > 0
+														? (detail.subtotal * detail.taxRate) /
+															(100 + detail.taxRate)
+														: 0;
+												return (
+													<tr key={idx}>
+														<td className="px-4 py-2">{detail.productName}</td>
+														<td className="px-4 py-2 text-right">
+															{detail.quantity}
+														</td>
+														<td className="px-4 py-2 text-right">
+															{formatCurrency(detail.unitPriceSnapshot)}
+														</td>
+														<td className="px-4 py-2 text-right text-muted-foreground">
+															{detail.taxRate > 0
+																? `${formatCurrency(iva)} (${detail.taxRate}%)`
+																: "-"}
+														</td>
+														<td className="px-4 py-2 text-right font-medium">
+															{formatCurrency(detail.subtotal)}
+														</td>
+													</tr>
+												);
+											})}
+										</tbody>
 									</table>
 								</div>
 							</div>
@@ -433,7 +455,9 @@ export const InvoicesPage: React.FC = () => {
 								</div>
 								<div className="flex justify-between text-sm">
 									<span className="text-muted-foreground">IVA</span>
-									<span>{formatCurrency(selectedInvoice.taxTotalSnapshot)}</span>
+									<span>
+										{formatCurrency(selectedInvoice.taxTotalSnapshot)}
+									</span>
 								</div>
 								<div className="flex justify-between text-lg font-black border-t pt-2">
 									<span>Total</span>
