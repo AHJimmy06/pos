@@ -35,6 +35,47 @@ interface CartSidebarProps {
 	onError?: (message: string) => void;
 }
 
+// Helper para formatear valores Money o números
+const formatMoney = (value: unknown): string => {
+	if (!value) return "$0";
+
+	// Si es un objeto con propiedad 'value' (Money o similar)
+	if (typeof value === "object" && value !== null) {
+		const obj = value as Record<string, unknown>;
+
+		// Verificar si tiene 'value' público
+		if ("value" in obj && typeof obj.value === "number") {
+			return new Intl.NumberFormat("es-CO", {
+				style: "currency",
+				currency: "COP",
+				minimumFractionDigits: 0,
+			}).format(obj.value);
+		}
+
+		// Si tiene '_value' (Money usa _value internamente)
+		if ("_value" in obj && typeof obj._value === "number") {
+			return new Intl.NumberFormat("es-CO", {
+				style: "currency",
+				currency: "COP",
+				minimumFractionDigits: 0,
+			}).format(obj._value as number);
+		}
+
+		// Si es un objeto vacío o sin valor reconocible
+		return "$0";
+	}
+
+	if (typeof value === "number") {
+		return new Intl.NumberFormat("es-CO", {
+			style: "currency",
+			currency: "COP",
+			minimumFractionDigits: 0,
+		}).format(value);
+	}
+
+	return String(value) || "$0";
+};
+
 export const CartSidebar: React.FC<CartSidebarProps> = ({
 	onSuccess,
 	onError,
@@ -65,14 +106,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 	) => {
 		if (!currentInvoice) return;
 		const product = products.find((p: { id: number }) => p.id === productId);
-		const stock = product?.stock ?? 0;
+		// Adapt stock to domain format
+		const stockValue =
+			typeof product?.stock === "object" && product?.stock !== null
+				? (product.stock as { value: number }).value
+				: ((product?.stock as number) ?? 0);
 
 		try {
 			const updated = useCases.updateQuantity.execute(
 				currentInvoice,
 				productId,
 				delta,
-				stock,
+				stockValue,
 				name,
 			);
 			setInvoice(updated as typeof currentInvoice);
@@ -102,8 +147,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 		}
 	};
 
+	// Obtener valores formateados del invoice
+	const invoiceSubtotal = currentInvoice?.subtotal;
+	const invoiceTaxTotal = currentInvoice?.taxTotal;
+	const invoiceTotal = currentInvoice?.total;
+
 	return (
-		<Card className="flex flex-col h-[calc(100vh-100px)] sticky top-4 shadow-xl border-border/50 overflow-hidden">
+		<Card className="flex flex-col h-[calc(100vh-100px)] shadow-xl border-border/50 overflow-hidden">
 			<div className="hidden">
 				{currentInvoice && selectedClient && (
 					<InvoicePDF
@@ -161,10 +211,17 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 							</thead>
 							<tbody className="divide-y divide-border/50">
 								{currentInvoice.details.map((item: InvoiceDetail) => {
+									// Adapt product stock for comparison
 									const product = products.find(
 										(p: { id: number }) => p.id === item.productId,
 									);
-									const isAtMaxStock = item.quantity >= (product?.stock || 0);
+									const stockValue = product
+										? typeof product.stock === "object" &&
+											product.stock !== null
+											? (product.stock as { value: number }).value
+											: (product.stock as number)
+										: 0;
+									const isAtMaxStock = item.quantity >= stockValue;
 
 									return (
 										<tr
@@ -211,8 +268,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 												</div>
 											</td>
 											<td className="px-2 py-3 text-right">
-												<span className="text-xs font-medium text-muted-foreground">
-													{item.unitPrice.toString()}
+												<span className="text-xs font-medium text-muted-foreground font-mono">
+													{formatMoney(item.unitPrice)}
 												</span>
 											</td>
 											<td className="px-2 py-3 text-center">
@@ -223,8 +280,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 												</span>
 											</td>
 											<td className="pr-5 py-3 text-right relative w-28">
-												<span className="text-xs font-black group-hover:opacity-0 transition-opacity block">
-													{item.total.toString()}
+												<span className="text-xs font-black font-mono group-hover:opacity-0 transition-opacity block">
+													{formatMoney(item.total)}
 												</span>
 												<Button
 													variant="ghost"
@@ -250,16 +307,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 						<span className="text-muted-foreground uppercase tracking-tighter text-[9px] font-bold">
 							Subtotal
 						</span>
-						<span className="font-bold">
-							{currentInvoice?.subtotal.toString() || "$0.00"}
+						<span className="font-bold font-mono">
+							{formatMoney(invoiceSubtotal)}
 						</span>
 					</div>
 					<div className="flex justify-between text-xs">
 						<span className="text-muted-foreground uppercase tracking-tighter text-[9px] font-bold">
 							IVA
 						</span>
-						<span className="font-bold">
-							{currentInvoice?.taxTotal.toString() || "$0.00"}
+						<span className="font-bold font-mono">
+							{formatMoney(invoiceTaxTotal)}
 						</span>
 					</div>
 					<Separator className="my-2" />
@@ -268,8 +325,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 							<p className="text-[9px] font-black text-primary uppercase tracking-widest">
 								Total
 							</p>
-							<h3 className="text-2xl font-black tracking-tighter">
-								{currentInvoice?.total.toString() || "$0.00"}
+							<h3 className="text-2xl font-black tracking-tighter font-mono">
+								{formatMoney(invoiceTotal)}
 							</h3>
 						</div>
 						{currentInvoice &&

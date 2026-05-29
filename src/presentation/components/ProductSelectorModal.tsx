@@ -1,23 +1,26 @@
 import React, { useState } from "react";
-import { useClients, type Client } from "../hooks/useClients";
+import { useProducts } from "../hooks/useProducts";
+import { useTaxes } from "../hooks/usePOS";
 import { usePOSStore } from "../store/usePOSStore";
+import { useApplication } from "../context/use-application";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-	User,
+	Package,
 	Search,
 	X,
 	Loader2,
 	ChevronLeft,
 	ChevronRight,
+	Plus,
 } from "lucide-react";
 
-interface ClientSelectorModalProps {
+interface ProductSelectorModalProps {
 	triggerClassName?: string;
 }
 
-export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
+export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	triggerClassName,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
@@ -26,12 +29,40 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 	const [searchInput, setSearchInput] = useState("");
 	const [currentPageInput, setCurrentPageInput] = useState("");
 
-	const { selectedClient, setSelectedClient, clear } = usePOSStore();
-	const { clients, total, totalPages, isLoading } = useClients(
+	const { selectedClient, setInvoice } = usePOSStore();
+	const { useCases } = useApplication();
+
+	const { products, total, totalPages, isLoading } = useProducts(
 		page,
 		15,
 		search,
 	);
+
+	// Get taxes for adding to products
+	const taxesData = useTaxes();
+	const taxes =
+		(taxesData as any)?.taxes || (taxesData as any)?.data || taxesData || [];
+
+	// Adapt products - keep as plain numbers for domain to wrap
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const adaptedProducts: any[] = (products || []).map((p) => {
+		const stockValue =
+			typeof p.stock === "object" && "value" in p.stock
+				? (p.stock as { value: number }).value
+				: (p.stock as number);
+		const priceValue =
+			typeof p.price === "object" && "value" in p.price
+				? (p.price as { value: number }).value
+				: (p.price as number);
+		return {
+			...p,
+			// Pass as plain numbers - domain will wrap in Money/StockQuantity
+			stock: stockValue,
+			price: priceValue,
+			hasStock: stockValue > 0,
+			canSell: (quantity: number) => stockValue >= quantity && p.isActive,
+		};
+	});
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -48,19 +79,34 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		setCurrentPageInput("");
 	};
 
-	const handleSelectClient = (client: Client) => {
-		setSelectedClient(client as any);
-		setIsOpen(false);
-		setSearch("");
-		setPage(1);
-		setSearchInput("");
-	};
+	const handleAddProduct = (product: (typeof adaptedProducts)[0]) => {
+		if (!product.hasStock || !selectedClient) return;
 
-	const handleClear = () => {
-		clear();
-		setSearch("");
-		setPage(1);
-		setSearchInput("");
+		// Get current invoice from store
+		const currentInvoice = usePOSStore.getState().currentInvoice;
+		if (!currentInvoice) return;
+
+		try {
+			// Filter taxes for this product
+			const productTaxes = (taxes || []).filter((t: { id: number }) =>
+				(product as any).taxIds?.includes(t.id),
+			);
+
+			const updatedInvoice = useCases.addItem.execute(
+				currentInvoice,
+				product as any,
+				1,
+				productTaxes,
+			);
+			setInvoice(updatedInvoice);
+			setIsOpen(false);
+			setSearch("");
+			setPage(1);
+			setSearchInput("");
+		} catch (e: unknown) {
+			const error = e as { message?: string };
+			alert(error?.message || "Error desconocido");
+		}
 	};
 
 	const getVisiblePages = () => {
@@ -83,49 +129,31 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		return pageList;
 	};
 
+	const formatCurrency = (value: number) =>
+		new Intl.NumberFormat("es-CO", {
+			style: "currency",
+			currency: "COP",
+			minimumFractionDigits: 0,
+		}).format(value);
+
 	return (
 		<>
-			{/* Trigger - shown when no client selected */}
-			{!selectedClient && (
-				<button
-					onClick={() => setIsOpen(true)}
-					className={`w-full p-3 border-2 border-dashed border-muted rounded-xl text-center hover:border-primary/30 hover:bg-muted/20 transition-all ${triggerClassName || ""}`}
-				>
-					<p className="text-[10px] font-medium text-muted-foreground italic">
-						Seleccionar Cliente
-					</p>
-				</button>
-			)}
-
-			{/* Selected Client Badge */}
-			{selectedClient && (
-				<div className="flex items-center gap-3 p-3 bg-background rounded-xl border border-border shadow-sm">
-					<div className="bg-primary/10 p-1.5 rounded-lg text-primary">
-						<User className="size-4" />
-					</div>
-					<div className="flex-1 min-w-0">
-						<p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-							Cliente Activo
-						</p>
-						<p className="text-xs font-bold truncate">
-							{selectedClient.fullName ||
-								`${selectedClient.firstName} ${selectedClient.lastName}`}
-						</p>
-					</div>
-					<button
-						onClick={handleClear}
-						className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-					>
-						<X className="size-4" />
-					</button>
-					<button
-						onClick={() => setIsOpen(true)}
-						className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-					>
-						<Search className="size-4" />
-					</button>
-				</div>
-			)}
+			{/* Trigger */}
+			<button
+				onClick={() => selectedClient && setIsOpen(true)}
+				disabled={!selectedClient}
+				className={`w-full p-3 border-2 border-dashed rounded-xl text-center transition-all ${
+					!selectedClient
+						? "opacity-60 cursor-not-allowed border-muted"
+						: "border-muted hover:border-primary/30 hover:bg-muted/20"
+				} ${triggerClassName || ""}`}
+			>
+				<p className="text-[10px] font-medium text-muted-foreground italic">
+					{selectedClient
+						? "Buscar y agregar productos"
+						: "Primero seleccione un cliente"}
+				</p>
+			</button>
 
 			{/* Modal */}
 			{isOpen && (
@@ -142,14 +170,14 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 						<div className="flex items-center justify-between p-6 border-b border-border">
 							<div className="flex items-center gap-3">
 								<div className="bg-primary p-2 rounded-lg text-primary-foreground">
-									<User className="size-5" />
+									<Package className="size-5" />
 								</div>
 								<div>
 									<h2 className="text-xl font-black tracking-tight">
-										Seleccionar Cliente
+										Agregar Productos
 									</h2>
 									<p className="text-sm text-muted-foreground">
-										Busca y selecciona un cliente ({total} disponibles)
+										Busca y selecciona productos ({total} disponibles)
 									</p>
 								</div>
 							</div>
@@ -167,7 +195,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 								<div className="relative flex-1">
 									<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
 									<Input
-										placeholder="Buscar por nombre o email..."
+										placeholder="Buscar por nombre o ID..."
 										value={searchInput}
 										onChange={(e) => setSearchInput(e.target.value)}
 										className="pl-10"
@@ -193,65 +221,63 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 							</form>
 						</div>
 
-						{/* Client List */}
+						{/* Product List */}
 						<div className="flex-1 overflow-y-auto p-4">
 							{isLoading ? (
 								<div className="flex items-center justify-center h-64">
 									<Loader2 className="size-8 animate-spin text-primary" />
 								</div>
-							) : clients.length === 0 ? (
+							) : adaptedProducts.length === 0 ? (
 								<div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-									<User className="size-12 mb-4 opacity-30" />
-									<p className="font-medium">No se encontraron clientes</p>
+									<Package className="size-12 mb-4 opacity-30" />
+									<p className="font-medium">No se encontraron productos</p>
 								</div>
 							) : (
 								<div className="space-y-2">
-									{clients.map((client) => {
-										const isSelected = selectedClient?.id === client.id;
-										return (
-											<button
-												key={client.id}
-												onClick={() => handleSelectClient(client)}
-												className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-													isSelected
-														? "border-primary bg-primary/5 ring-2 ring-primary/20"
-														: "border-border hover:border-primary/30 hover:bg-muted/50"
-												}`}
-											>
-												<div className="size-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground font-bold text-xs shrink-0">
-													#{client.id}
-												</div>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-center gap-2">
-														<p className="text-sm font-bold truncate">
-															{client.firstName} {client.lastName}
-														</p>
-														{isSelected && (
-															<Badge variant="default" className="text-[9px]">
-																Seleccionado
-															</Badge>
-														)}
-													</div>
-													<p className="text-xs text-muted-foreground truncate">
-														{client.email}
+									{adaptedProducts.map((product) => (
+										<div
+											key={product.id}
+											className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+												!product.hasStock
+													? "border-border opacity-50"
+													: "border-border hover:border-primary/30 hover:bg-muted/50"
+											}`}
+										>
+											<div className="size-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground font-bold text-xs shrink-0">
+												#{product.id}
+											</div>
+											<div className="flex-1 min-w-0">
+												<div className="flex items-center gap-2">
+													<p className="text-sm font-bold truncate">
+														{product.name}
 													</p>
-												</div>
-												<div className="text-right shrink-0">
-													{client.phone && (
-														<p className="text-xs text-muted-foreground">
-															{client.phone}
-														</p>
+													{!product.hasStock && (
+														<Badge variant="destructive" className="text-[9px]">
+															Agotado
+														</Badge>
 													)}
-													<Badge
-														variant={client.isActive ? "secondary" : "outline"}
-														className="text-[9px] mt-1"
-													>
-														{client.isActive ? "Activo" : "Inactivo"}
-													</Badge>
 												</div>
-											</button>
-										);
-									})}
+												<p className="text-xs text-muted-foreground">
+													Stock: {product.stock} unidades
+												</p>
+											</div>
+											<div className="text-right shrink-0">
+												<p className="text-sm font-bold text-primary">
+													{formatCurrency(product.price)}
+												</p>
+												{product.hasStock && (
+													<Button
+														size="sm"
+														className="mt-1 h-7 text-xs"
+														onClick={() => handleAddProduct(product)}
+													>
+														<Plus className="size-3 mr-1" />
+														Agregar
+													</Button>
+												)}
+											</div>
+										</div>
+									))}
 								</div>
 							)}
 						</div>
@@ -260,7 +286,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 						{totalPages > 1 && (
 							<div className="flex flex-wrap items-center justify-between p-4 border-t border-border bg-muted/20 gap-4">
 								<p className="text-sm text-muted-foreground">
-									Pagina {page} de {totalPages} ({total} clientes)
+									Pagina {page} de {totalPages} ({total} productos)
 								</p>
 								<div className="flex items-center gap-2">
 									<Button

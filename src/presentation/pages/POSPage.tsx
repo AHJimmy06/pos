@@ -1,8 +1,8 @@
 import React from "react";
-import { ProductGrid } from "../components/ProductGrid";
 import { ClientSelectorModal } from "../components/ClientSelectorModal";
+import { ProductSelectorModal } from "../components/ProductSelectorModal";
 import { CartSidebar } from "../components/CartSidebar";
-import { InvoiceHistory } from "../components/InvoiceHistory";
+
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Warehouse } from "lucide-react";
 import { Toast } from "@/components/ui/toast";
@@ -38,45 +38,37 @@ export const POSPage: React.FC = () => {
 			</div>
 
 			{/* Main Content */}
-			<div className="container mx-auto px-6 py-6">
-				<div className="grid grid-cols-12 gap-6 items-start">
-					{/* LADO IZQUIERDO: SELECCIÓN + HISTORIAL (7 Columnas) */}
-					<div className="col-span-12 lg:col-span-7 space-y-6">
-						<Card>
-							<CardHeader>
-								<CardTitle className="uppercase tracking-tight text-xs font-black text-muted-foreground">
-									1. Cliente
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<ClientSelectorModal />
-							</CardContent>
-						</Card>
+			<div className="container mx-auto px-6 py-6 space-y-6">
+				{/* Row 1: Cliente y Productos */}
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<Card>
+						<CardHeader>
+							<CardTitle className="uppercase tracking-tight text-xs font-black text-muted-foreground">
+								1. Cliente
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<ClientSelectorModal />
+						</CardContent>
+					</Card>
 
-						<Card>
-							<CardHeader>
-								<CardTitle className="uppercase tracking-tight text-xs font-black text-muted-foreground">
-									2. Productos
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<ProductGrid />
-							</CardContent>
-						</Card>
-
-						<InvoiceHistory />
-					</div>
-
-					{/* LADO DERECHO: FACTURA (5 Columnas) */}
-					<div className="col-span-12 lg:col-span-5 h-full">
-						<CartSidebar
-							onSuccess={() =>
-								showToast("¡Venta realizada con éxito!", "success")
-							}
-							onError={(msg) => showToast(msg, "error")}
-						/>
-					</div>
+					<Card>
+						<CardHeader>
+							<CardTitle className="uppercase tracking-tight text-xs font-black text-muted-foreground">
+								2. Productos
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<ProductSelectorModal />
+						</CardContent>
+					</Card>
 				</div>
+
+				{/* Row 2: Carrito - Full Width */}
+				<CartSidebar
+					onSuccess={() => showToast("¡Venta realizada con éxito!", "success")}
+					onError={(msg) => showToast(msg, "error")}
+				/>
 			</div>
 		</div>
 	);

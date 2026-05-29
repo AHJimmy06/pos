@@ -24,20 +24,27 @@ apiClient.interceptors.response.use(
 	(response) => {
 		const data = response.data;
 
-		// Verificar si es respuesta paginada: { success: true, data: { data: [], total } }
-		if (data?.success === true && data?.data) {
+		// Verificar si es respuesta de error con status 200 (caso raro pero posible)
+		if (data?.success === false) {
+			const errorMsg = data.error || data.message || "Error del servidor";
+			return Promise.reject(new Error(errorMsg));
+		}
+
+		// Solo transformar si es respuesta paginada: { success: true, data: { data: [], total } }
+		if (data?.success === true && data?.data !== undefined) {
 			const innerData = data.data;
 
+			// Verificar si es respuesta paginada
 			if (
 				Array.isArray(innerData.data) &&
 				typeof innerData.total === "number"
 			) {
-				return innerData; // Devolver { data: [], total }
+				return response; // Devolver la respuesta completa para que el repository la procese
 			}
-			return innerData;
 		}
 
-		return data;
+		// Para respuestas simples o errores, retornar la respuesta completa
+		return response;
 	},
 	(error) => {
 		const responseData = error.response?.data;
