@@ -8,7 +8,6 @@ import { InvoiceDetail } from "@/domain/entities/invoice.entity";
 import {
 	ShoppingCart,
 	Trash2,
-	Receipt,
 	Plus,
 	Minus,
 	CreditCard,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { InvoicePDF } from "./InvoicePDF";
+import { ClientSelectorModal } from "./ClientSelectorModal";
 import {
 	Card,
 	CardContent,
@@ -133,27 +133,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 					</Badge>
 				</div>
 
-				{selectedClient ? (
-					<div className="flex items-center gap-3 p-3 bg-background rounded-xl border border-border shadow-sm">
-						<div className="bg-primary/10 p-1.5 rounded-lg text-primary">
-							<Receipt className="size-4" />
-						</div>
-						<div className="flex-1 min-w-0">
-							<p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-								Cliente Activo
-							</p>
-							<p className="text-xs font-bold truncate">
-								{selectedClient.fullName}
-							</p>
-						</div>
-					</div>
-				) : (
-					<div className="p-3 border-2 border-dashed border-muted rounded-xl text-center">
-						<p className="text-[10px] font-medium text-muted-foreground italic">
-							Seleccione un cliente
-						</p>
-					</div>
-				)}
+				{/* Cliente - usa modal en vez de dropdown */}
+				<ClientSelectorModal />
 			</CardHeader>
 
 			<CardContent className="flex-1 p-0 overflow-hidden">
