@@ -57,10 +57,13 @@ function getPayload<T>(response: unknown): T | null {
 	return data as T;
 }
 
+export type SearchField = "all" | "id" | "name" | "email" | "phone";
+
 interface UseClientsResult {
 	clients: Client[];
 	total: number;
 	totalPages: number;
+	limit: number;
 	isLoading: boolean;
 	isError: boolean;
 	error: unknown;
@@ -76,11 +79,12 @@ export const useClients = (
 	page = 1,
 	limit = 15,
 	search = "",
+	searchField: SearchField = "all",
 ): UseClientsResult => {
 	const queryClient = useQueryClient();
 
 	const clientsQuery = useQuery({
-		queryKey: ["clients", { page, limit, search }],
+		queryKey: ["clients", { page, limit, search, searchField }],
 		queryFn: async (): Promise<PaginatedResponse<Client>> => {
 			const params = new URLSearchParams({
 				page: String(page),
@@ -88,6 +92,7 @@ export const useClients = (
 			});
 			if (search) {
 				params.append("search", search);
+				params.append("searchField", searchField);
 			}
 			const response = await apiClient.get(`/clients?${params}`);
 			return (
@@ -151,6 +156,7 @@ export const useClients = (
 		totalPages: Math.ceil(
 			((clientsQuery.data as PaginatedResponse<Client>)?.total ?? 0) / limit,
 		),
+		limit,
 		isLoading: clientsQuery.isLoading,
 		isError: clientsQuery.isError,
 		error: clientsQuery.error,

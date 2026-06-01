@@ -3,6 +3,7 @@ import {
 	useClients,
 	type Client,
 	type CreateClientDto,
+	type SearchField,
 } from "../hooks/useClients";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,24 @@ import {
 	Users,
 } from "lucide-react";
 
+// Opciones de cantidad de registros
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
+
+// Mapping de labels para búsqueda
+const SEARCH_FIELD_LABELS: Record<string, string> = {
+	all: "Buscar por todos los campos...",
+	id: "Buscar por ID...",
+	name: "Buscar por nombre...",
+	email: "Buscar por email...",
+	phone: "Buscar por teléfono...",
+};
+
 export const ClientsPage: React.FC = () => {
 	const [page, setPage] = useState(1);
+	const [limit, setLimit] = useState(15);
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
+	const [searchField, setSearchField] = useState<SearchField>("all");
 	const [currentPageInput, setCurrentPageInput] = useState("");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -48,7 +63,7 @@ export const ClientsPage: React.FC = () => {
 		isCreating,
 		isUpdating,
 		isDeleting,
-	} = useClients(page, 15, search);
+	} = useClients(page, limit, search, searchField);
 
 	const [formData, setFormData] = useState<CreateClientDto>({
 		firstName: "",
@@ -71,6 +86,17 @@ export const ClientsPage: React.FC = () => {
 			setPage(pageNum);
 		}
 		setCurrentPageInput("");
+	};
+
+	const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		setLimit(Number(e.target.value));
+		setPage(1);
+	};
+
+	const handleSearchFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		setSearchField(e.target.value as SearchField);
+		setSearch("");
+		setSearchInput("");
 	};
 
 	const openCreateDialog = () => {
@@ -194,15 +220,29 @@ export const ClientsPage: React.FC = () => {
 			{/* Table Card */}
 			<Card className="border-none shadow-sm">
 				<CardHeader className="pb-4">
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between flex-wrap gap-4">
 						<CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
 							Listado de Clientes ({total})
 						</CardTitle>
-						<form onSubmit={handleSearch} className="flex gap-2">
+						<form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
+							{/* Selector de campo de búsqueda */}
+							<select
+								value={searchField}
+								onChange={handleSearchFieldChange}
+								className="h-9 px-3 rounded-lg border border-input bg-background text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[100px]"
+							>
+								<option value="all">Todos</option>
+								<option value="id">ID</option>
+								<option value="name">Nombre</option>
+								<option value="email">Email</option>
+								<option value="phone">Teléfono</option>
+							</select>
+
+							{/* Input de búsqueda */}
 							<div className="relative">
 								<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
 								<Input
-									placeholder="Buscar por nombre o email..."
+									placeholder={SEARCH_FIELD_LABELS[searchField]}
 									value={searchInput}
 									onChange={(e) => setSearchInput(e.target.value)}
 									className="pl-10 w-64"
@@ -293,11 +333,31 @@ export const ClientsPage: React.FC = () => {
 					</div>
 
 					{/* Pagination */}
-					{totalPages > 1 && (
+					{totalPages > 0 && (
 						<div className="flex flex-wrap items-center justify-between mt-4 pt-4 gap-4">
+							{/* Selector de cantidad de registros */}
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">Mostrar</span>
+								<select
+									value={limit}
+									onChange={handleLimitChange}
+									className="h-8 px-2 rounded border border-input bg-background text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 w-16 text-center"
+								>
+									{PAGE_SIZE_OPTIONS.map((size) => (
+										<option key={size} value={size}>
+											{size}
+										</option>
+									))}
+								</select>
+								<span className="text-sm text-muted-foreground">
+									por página
+								</span>
+							</div>
+
 							<p className="text-sm text-muted-foreground">
-								Pagina {page} de {totalPages} ({total} clientes)
+								Página {page} de {totalPages} ({total} clientes)
 							</p>
+
 							<div className="flex items-center gap-2">
 								{/* Anterior */}
 								<Button

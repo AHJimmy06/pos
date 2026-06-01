@@ -49,10 +49,13 @@ function getPayload<T>(response: any): T | null {
 	return data as T;
 }
 
+export type SearchField = "all" | "id" | "name" | "price" | "stock";
+
 interface UseProductsResult {
 	products: Product[];
 	total: number;
 	totalPages: number;
+	limit: number;
 	isLoading: boolean;
 	isError: boolean;
 	error: unknown;
@@ -68,11 +71,12 @@ export const useProducts = (
 	page = 1,
 	limit = 15,
 	search = "",
+	searchField: SearchField = "all",
 ): UseProductsResult => {
 	const queryClient = useQueryClient();
 
 	const productsQuery = useQuery({
-		queryKey: ["products", { page, limit, search }],
+		queryKey: ["products", { page, limit, search, searchField }],
 		queryFn: async () => {
 			const params = new URLSearchParams({
 				page: String(page),
@@ -80,6 +84,7 @@ export const useProducts = (
 			});
 			if (search) {
 				params.append("search", search);
+				params.append("searchField", searchField);
 			}
 			const response = await apiClient.get(`/products?${params}`);
 			const payload = getPayload<PaginatedResponse<Product>>(response);
@@ -134,6 +139,7 @@ export const useProducts = (
 		products,
 		total,
 		totalPages: Math.ceil(total / limit),
+		limit,
 		isLoading: productsQuery.isLoading,
 		isError: productsQuery.isError,
 		error: productsQuery.error,
