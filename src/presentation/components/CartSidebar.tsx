@@ -55,8 +55,8 @@ const InvoicePrintModal: React.FC<{
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-			<div className="bg-background rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-				<div className="flex items-center justify-between p-4 border-b border-border">
+			<div className="bg-background rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+				<div className="flex items-center justify-between p-6 border-b border-border bg-card">
 					<h2 className="font-black text-lg">Factura #{invoiceNumber}</h2>
 					<div className="flex gap-2">
 						<Button variant="outline" size="sm" onClick={handlePrint}>
@@ -67,7 +67,7 @@ const InvoicePrintModal: React.FC<{
 						</Button>
 					</div>
 				</div>
-				<div className="p-4">
+				<div className="p-8 bg-muted/30 flex justify-center">
 					<InvoicePDF
 						ref={componentRef}
 						invoice={invoice!}
