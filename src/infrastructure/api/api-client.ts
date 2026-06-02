@@ -19,42 +19,75 @@ apiClient.interceptors.request.use(
 	(error) => Promise.reject(error),
 );
 
+// Función recursiva para normalizar objetos del dominio (maneja guiones bajos y Value Objects)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalize(obj: any): any {
+	if (Array.isArray(obj)) return obj.map(normalize);
+	if (obj === null || typeof obj !== "object" || obj instanceof Date) return obj;
+
+	// Evitar procesar objetos que ya son limpios o de librerías (ej. AxiosResponse)
+	if ("config" in obj && "headers" in obj && "request" in obj) return obj;
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const result: any = {};
+	for (const key in obj) {
+		let value = obj[key];
+		let newKey = key;
+
+		// 1. Quitar guion bajo inicial (propiedades privadas serializadas)
+		if (key.startsWith("_")) {
+			newKey = key.substring(1);
+		}
+
+		// 2. Desempaquetar Value Objects { value: ... }
+		// Solo si tiene exactamente una propiedad llamada 'value' o es un objeto simple de valor
+		if (
+			value &&
+			typeof value === "object" &&
+			"value" in value &&
+			Object.keys(value).length === 1
+		) {
+			value = value.value;
+		}
+
+		result[newKey] = normalize(value);
+	}
+	return result;
+}
+
 // Interzor para manejar el formato de respuesta de NestJS
 apiClient.interceptors.response.use(
 	(response) => {
 		const data = response.data;
 
-		// Verificar si es respuesta de error con status 200 (caso raro pero posible)
-		if (data?.success === false) {
-			const errorMsg = data.error || data.message || "Error del servidor";
-			return Promise.reject(new Error(errorMsg));
+		// Si es una respuesta exitosa con el wrapper de NestJS { success: true, data: ... }
+		if (
+			data &&
+			typeof data === "object" &&
+			data.success === true &&
+			"data" in data
+		) {
+			// Devolvemos el contenido de 'data' normalizado
+			response.data = normalize(data.data);
+		} else {
+			// Normalizar incluso si no tiene el wrapper
+			response.data = normalize(data);
 		}
 
-		// Solo transformar si es respuesta paginada: { success: true, data: { data: [], total } }
-		if (data?.success === true && data?.data !== undefined) {
-			const innerData = data.data;
-
-			// Verificar si es respuesta paginada
-			if (
-				Array.isArray(innerData.data) &&
-				typeof innerData.total === "number"
-			) {
-				return response; // Devolver la respuesta completa para que el repository la procese
-			}
-		}
-
-		// Para respuestas simples o errores, retornar la respuesta completa
 		return response;
 	},
 	(error) => {
 		const responseData = error.response?.data;
-		if (responseData?.error) {
-			return Promise.reject(new Error(responseData.error));
+		// Manejar errores envueltos o directos
+		const errorObj = responseData?.data || responseData;
+		
+		if (errorObj?.error) {
+			return Promise.reject(new Error(errorObj.error));
 		}
-		if (responseData?.message) {
-			const msg = Array.isArray(responseData.message)
-				? responseData.message.join(", ")
-				: responseData.message;
+		if (errorObj?.message) {
+			const msg = Array.isArray(errorObj.message)
+				? errorObj.message.join(", ")
+				: errorObj.message;
 			return Promise.reject(new Error(msg));
 		}
 		return Promise.reject(new Error(error.message || "Error de conexión"));

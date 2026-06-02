@@ -29,34 +29,6 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
-// Helper para extraer payload de respuestas NestJS
-function getPayload<T>(response: unknown): T | null {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const res = response as any;
-	const data = res?.data;
-
-	if (!data) return null;
-
-	// Si tiene estructura NestJS wrapper { success, data: ... }
-	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		// Si es paginado
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
-			return inner as T;
-		}
-		// Si es simple
-		return inner as T;
-	}
-
-	// Si no tiene wrapper
-	return data as T;
-}
-
 export type SearchField = "all" | "id" | "name" | "email" | "phone";
 
 interface UseClientsResult {
@@ -94,22 +66,16 @@ export const useClients = (
 				params.append("search", search);
 				params.append("searchField", searchField);
 			}
-			const response = await apiClient.get(`/clients?${params}`);
-			return (
-				getPayload<PaginatedResponse<Client>>(response) ?? {
-					data: [],
-					total: 0,
-				}
-			);
+			const response = await apiClient.get<PaginatedResponse<Client>>(`/clients?${params}`);
+			return response.data ?? { data: [], total: 0 };
 		},
 	});
 
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateClientDto): Promise<Client> => {
-			const response = await apiClient.post("/clients", data);
-			const payload = getPayload<Client>(response);
-			if (!payload) throw new Error("Error al crear cliente");
-			return payload;
+			const response = await apiClient.post<Client>("/clients", data);
+			if (!response.data) throw new Error("Error al crear cliente");
+			return response.data;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -124,10 +90,9 @@ export const useClients = (
 			id: number;
 			data: UpdateClientDto;
 		}): Promise<Client> => {
-			const response = await apiClient.put(`/clients/${id}`, data);
-			const payload = getPayload<Client>(response);
-			if (!payload) throw new Error("Error al actualizar cliente");
-			return payload;
+			const response = await apiClient.put<Client>(`/clients/${id}`, data);
+			if (!response.data) throw new Error("Error al actualizar cliente");
+			return response.data;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });

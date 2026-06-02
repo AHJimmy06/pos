@@ -33,26 +33,6 @@ interface UsersResponse {
 	total: number;
 }
 
-// Helper para extraer payload de respuestas NestJS
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPayload<T>(response: any): T | null {
-	const data = response?.data;
-	if (!data) return null;
-	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
-			return inner as T;
-		}
-		return inner as T;
-	}
-	return data as T;
-}
-
 export const UsersPage: React.FC = () => {
 	const [page, setPage] = useState(1);
 	const [search, setSearch] = useState("");
@@ -69,9 +49,8 @@ export const UsersPage: React.FC = () => {
 			if (search) {
 				params.append("search", search);
 			}
-			const res = await apiClient.get(`/users?${params}`);
-			const payload = getPayload<UsersResponse>(res);
-			return payload ?? { data: [], total: 0 };
+			const res = await apiClient.get<UsersResponse>(`/users?${params}`);
+			return res.data ?? { data: [], total: 0 };
 		},
 	});
 
