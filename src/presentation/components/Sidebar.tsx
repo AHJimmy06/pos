@@ -7,7 +7,6 @@ import {
 	Package,
 	Settings,
 	LogOut,
-	LayoutDashboard,
 	Percent,
 	ChevronRight,
 	FileText,
@@ -23,12 +22,6 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-	{
-		title: "Dashboard",
-		path: "/dashboard",
-		icon: LayoutDashboard,
-		roles: ["ADMINISTRATOR"],
-	},
 	{
 		title: "Punto de Venta",
 		path: "/pos",
