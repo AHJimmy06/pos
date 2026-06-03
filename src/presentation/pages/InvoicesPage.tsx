@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useInvoices, type Invoice } from "../hooks/useInvoices";
+import { useAuth } from "../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,9 @@ export const InvoicesPage: React.FC = () => {
 		cancelInvoice,
 		isCancelling,
 	} = useInvoices(page, 15, searchId);
+
+	const { user } = useAuth();
+	const isAdmin = user?.role === "ADMINISTRATOR";
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -242,7 +246,7 @@ export const InvoicesPage: React.FC = () => {
 												>
 													<Eye className="size-4" />
 												</Button>
-												{invoice.status === "CONFIRMED" && (
+												{isAdmin && invoice.status === "CONFIRMED" && (
 													<Button
 														variant="ghost"
 														size="icon-sm"

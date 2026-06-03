@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ShoppingCart, LogIn, AlertCircle } from "lucide-react";
+import { ShoppingCart, LogIn, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 interface LoginResponse {
 	accessToken: string;
@@ -49,6 +49,7 @@ function getPayload<T>(response: any): T | null {
 export const LoginPage: React.FC = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -133,26 +134,48 @@ export const LoginPage: React.FC = () => {
 							)}
 							<div className="space-y-2">
 								<Label htmlFor="email">Correo Electrónico</Label>
-								<Input
-									id="email"
-									type="email"
-									placeholder="admin@gentleman.com"
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									required
-									className="bg-background/50"
-								/>
+								<div className="relative">
+									<Input
+										id="email"
+										type="email"
+										placeholder="admin@gentleman.com"
+										value={email}
+										onChange={(e) => setEmail(e.target.value.slice(0, 40))}
+										required
+										className="bg-background/50 pr-10"
+										maxLength={40}
+									/>
+									<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+										{email.length}/40
+									</span>
+								</div>
 							</div>
 							<div className="space-y-2">
 								<Label htmlFor="password">Contraseña</Label>
-								<Input
-									id="password"
-									type="password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-									className="bg-background/50"
-								/>
+								<div className="relative">
+									<Input
+										id="password"
+										type={showPassword ? "text" : "password"}
+										value={password}
+										onChange={(e) => setPassword(e.target.value)}
+										required
+										className="bg-background/50 pr-10"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPassword(!showPassword)}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+										aria-label={
+											showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+										}
+									>
+										{showPassword ? (
+											<EyeOff className="size-4" />
+										) : (
+											<Eye className="size-4" />
+										)}
+									</button>
+								</div>
 							</div>
 						</CardContent>
 						<CardFooter>

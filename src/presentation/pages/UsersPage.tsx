@@ -1,7 +1,17 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/infrastructure/api/api-client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from "@/components/ui/dialog";
 import {
 	UserPlus,
 	ShieldAlert,
@@ -14,9 +24,6 @@ import {
 	Users,
 	Search,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 
 interface User {
 	id: number;
@@ -38,6 +45,19 @@ export const UsersPage: React.FC = () => {
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [currentPageInput, setCurrentPageInput] = useState("");
+	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const [formData, setFormData] = useState({
+		username: "",
+		name: "",
+		lastName: "",
+		email: "",
+		password: "",
+		role: "SELLER",
+	});
+
+	const queryClient = useQueryClient();
 
 	const { data, isLoading, error } = useQuery<UsersResponse>({
 		queryKey: ["users", { page, search }],
@@ -57,6 +77,38 @@ export const UsersPage: React.FC = () => {
 	const users: User[] = data?.data ?? [];
 	const total: number = data?.total ?? 0;
 	const totalPages = Math.ceil(total / 15);
+
+	const openCreateDialog = () => {
+		setFormData({
+			username: "",
+			name: "",
+			lastName: "",
+			email: "",
+			password: "",
+			role: "SELLER",
+		});
+		setIsDialogOpen(true);
+	};
+
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setIsSubmitting(true);
+		try {
+			await apiClient.post("/auth/register", {
+				username: formData.username,
+				name: formData.name,
+				lastName: formData.lastName,
+				email: formData.email,
+				password: formData.password,
+			});
+			setIsDialogOpen(false);
+			queryClient.invalidateQueries({ queryKey: ["users"] });
+		} catch (err) {
+			console.error("Error al registrar:", err);
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -128,7 +180,10 @@ export const UsersPage: React.FC = () => {
 						</p>
 					</div>
 				</div>
-				<Button className="font-bold uppercase tracking-tight">
+				<Button
+					className="font-bold uppercase tracking-tight"
+					onClick={openCreateDialog}
+				>
 					<UserPlus className="mr-2 size-4" /> Registrar Usuario
 				</Button>
 			</div>
@@ -339,6 +394,137 @@ export const UsersPage: React.FC = () => {
 					)}
 				</CardContent>
 			</Card>
+
+			{/* Register User Dialog */}
+			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Registrar Nuevo Usuario</DialogTitle>
+					</DialogHeader>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Usuario</label>
+							<Input
+								value={formData.username}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										username: e.target.value.slice(0, 20),
+									})
+								}
+								required
+								placeholder="juan.perez"
+								maxLength={20}
+							/>
+							<span className="text-xs text-muted-foreground">
+								{formData.username.length}/20
+							</span>
+						</div>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">Nombre</label>
+								<Input
+									value={formData.name}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											name: e.target.value.slice(0, 15),
+										})
+									}
+									required
+									placeholder="Juan"
+									maxLength={15}
+								/>
+								<span className="text-xs text-muted-foreground">
+									{formData.name.length}/15
+								</span>
+							</div>
+							<div className="space-y-2">
+								<label className="text-sm font-medium">Apellido</label>
+								<Input
+									value={formData.lastName}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											lastName: e.target.value.slice(0, 15),
+										})
+									}
+									required
+									placeholder="Perez"
+									maxLength={15}
+								/>
+								<span className="text-xs text-muted-foreground">
+									{formData.lastName.length}/15
+								</span>
+							</div>
+						</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Email</label>
+							<Input
+								type="email"
+								value={formData.email}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										email: e.target.value.slice(0, 40),
+									})
+								}
+								required
+								placeholder="juan@email.com"
+								maxLength={40}
+							/>
+							<span className="text-xs text-muted-foreground">
+								{formData.email.length}/40
+							</span>
+						</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Contraseña</label>
+							<Input
+								type="password"
+								value={formData.password}
+								onChange={(e) =>
+									setFormData({ ...formData, password: e.target.value })
+								}
+								required
+								placeholder="Minimo 8 caracteres"
+								minLength={8}
+							/>
+						</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Rol</label>
+							<select
+								value={formData.role}
+								onChange={(e) =>
+									setFormData({ ...formData, role: e.target.value })
+								}
+								className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+							>
+								<option value="SELLER">Vendedor</option>
+								<option value="ADMINISTRATOR">Administrador</option>
+							</select>
+						</div>
+						<DialogFooter>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setIsDialogOpen(false)}
+							>
+								Cancelar
+							</Button>
+							<Button type="submit" disabled={isSubmitting}>
+								{isSubmitting ? (
+									<>
+										<Loader2 className="size-4 mr-2 animate-spin" />
+										Registrando...
+									</>
+								) : (
+									"Registrar"
+								)}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 };
