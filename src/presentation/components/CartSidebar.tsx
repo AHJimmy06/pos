@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Money } from '@/domain/value-objects/money.vo';
 import { InvoiceDetail ,Invoice } from '@/domain/entities/invoice.entity';
 import { useQueryClient } from "@tanstack/react-query";
 import { usePOSStore } from "../store/usePOSStore";
