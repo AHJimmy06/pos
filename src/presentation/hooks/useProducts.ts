@@ -29,26 +29,6 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
-// Helper para extraer payload de respuestas NestJS
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPayload<T>(response: any): T | null {
-	const data = response?.data;
-	if (!data) return null;
-	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
-			return inner as T;
-		}
-		return inner as T;
-	}
-	return data as T;
-}
-
 export type SearchField = "all" | "id" | "name" | "price" | "stock";
 
 interface UseProductsResult {
@@ -86,22 +66,20 @@ export const useProducts = (
 				params.append("search", search);
 				params.append("searchField", searchField);
 			}
-			const response = await apiClient.get(`/products?${params}`);
-			const payload = getPayload<PaginatedResponse<Product>>(response);
-			return payload ?? { data: [], total: 0 };
+			const response = await apiClient.get<PaginatedResponse<Product>>(`/products?${params}`);
+			return response.data ?? { data: [], total: 0 };
 		},
 	});
 
-	const result = productsQuery.data as PaginatedResponse<Product> | undefined;
+	const result = productsQuery.data;
 	const products = result?.data ?? [];
 	const total = result?.total ?? 0;
 
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateProductDto): Promise<Product> => {
-			const response = await apiClient.post("/products", data);
-			const payload = getPayload<Product>(response);
-			if (!payload) throw new Error("Error al crear producto");
-			return payload;
+			const response = await apiClient.post<Product>("/products", data);
+			if (!response.data) throw new Error("Error al crear producto");
+			return response.data;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -116,10 +94,9 @@ export const useProducts = (
 			id: number;
 			data: UpdateProductDto;
 		}): Promise<Product> => {
-			const response = await apiClient.put(`/products/${id}`, data);
-			const payload = getPayload<Product>(response);
-			if (!payload) throw new Error("Error al actualizar producto");
-			return payload;
+			const response = await apiClient.put<Product>(`/products/${id}`, data);
+			if (!response.data) throw new Error("Error al actualizar producto");
+			return response.data;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });

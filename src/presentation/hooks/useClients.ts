@@ -95,12 +95,24 @@ export const useClients = (
 				params.append("searchField", searchField);
 			}
 			const response = await apiClient.get(`/clients?${params}`);
-			return (
-				getPayload<PaginatedResponse<Client>>(response) ?? {
-					data: [],
-					total: 0,
-				}
-			);
+			// Extraer el payload correctamente
+			const payload = getPayload<PaginatedResponse<Client>>(response);
+			
+			// Validar que sea un objeto con estructura correcta
+			if (
+				payload &&
+				typeof payload === "object" &&
+				"data" in payload &&
+				Array.isArray(payload.data)
+			) {
+				return payload;
+			}
+
+			// Si no es válido, retornar estructura por defecto
+			return {
+				data: [],
+				total: 0,
+			};
 		},
 	});
 
@@ -143,18 +155,20 @@ export const useClients = (
 		},
 	});
 
+	// Garantizar que siempre retornamos un array válido
+	const clientsData = clientsQuery.data ?? { data: [], total: 0 };
+	const clientsArray = Array.isArray(clientsData?.data) ? clientsData.data : [];
+
 	return {
-		clients: ((clientsQuery.data as PaginatedResponse<Client>)?.data ?? []).map(
-			(c) => ({
-				...c,
-				get fullName() {
-					return `${c.firstName} ${c.lastName}`;
-				},
-			}),
-		),
-		total: (clientsQuery.data as PaginatedResponse<Client>)?.total ?? 0,
+		clients: clientsArray.map((c) => ({
+			...c,
+			get fullName() {
+				return `${c.firstName} ${c.lastName}`;
+			},
+		})),
+		total: (clientsData?.total as number) ?? 0,
 		totalPages: Math.ceil(
-			((clientsQuery.data as PaginatedResponse<Client>)?.total ?? 0) / limit,
+			((clientsData?.total as number) ?? 0) / limit,
 		),
 		limit,
 		isLoading: clientsQuery.isLoading,

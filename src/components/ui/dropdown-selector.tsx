@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { ChevronDown, AlertCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
 
@@ -154,25 +154,27 @@ export function DropdownSelector({
       {/* Trigger */}
       <div
         ref={triggerRef}
-        onClick={() => !selected && !disabled && setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         className={cn(
           "flex items-center justify-between w-full px-4 rounded-xl border-2 cursor-pointer transition-all shadow-sm",
           triggerHeights[triggerHeight],
           selected
-            ? "bg-background border-primary/30 cursor-default"
+            ? "bg-background border-primary/30"
             : !disabled
-              ? "bg-background hover:border-border cursor-pointer"
+              ? "bg-background hover:border-border"
               : "opacity-60 cursor-not-allowed bg-muted border-transparent",
-          isOpen && selected && "border-primary ring-4 ring-primary/10"
+          isOpen && "border-primary ring-4 ring-primary/10"
         )}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className={cn(
-            "p-2 rounded-lg transition-colors shrink-0",
-            selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-          )}>
-            {triggerIcon}
-          </div>
+          {triggerIcon && (
+            <div className={cn(
+              "p-2 rounded-lg transition-colors shrink-0",
+              selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            )}>
+              {triggerIcon}
+            </div>
+          )}
           <div className="flex flex-col items-start text-left flex-1 min-w-0">
             <span className={cn(
               "text-sm font-bold truncate",
@@ -188,7 +190,6 @@ export function DropdownSelector({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!selected && !disabled && <AlertCircle className="size-4 text-amber-500" />}
           {selected ? (
             <button
               onClick={handleClear}
@@ -217,18 +218,6 @@ export function DropdownSelector({
           className="bg-popover border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200"
           style={dropdownStyle}
         >
-          {/* Search header */}
-          <div className="p-2 border-b border-border bg-muted/30">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder={searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full text-sm py-1.5 px-3 rounded-lg border border-input bg-background outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-
           {/* Options list */}
           <div className="max-h-60 overflow-y-auto">
             {paginatedOptions.length === 0 ? (
@@ -250,9 +239,6 @@ export function DropdownSelector({
                     )}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="size-10 bg-muted rounded-lg flex items-center justify-center text-muted-foreground font-bold text-xs shrink-0">
-                        #{option.id}
-                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold truncate">{option.label}</p>
                         <div className="flex items-center gap-2 mt-0.5">

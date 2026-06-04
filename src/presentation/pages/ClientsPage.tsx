@@ -5,6 +5,7 @@ import {
 	type CreateClientDto,
 	type SearchField,
 } from "../hooks/useClients";
+import { useAuth } from "../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,30 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Users,
+	AlertCircle,
 } from "lucide-react";
+
+/**
+ * Extrae un mensaje de error legible de diferentes tipos de errores
+ */
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	if (typeof error === "object" && error !== null) {
+		const obj = error as Record<string, unknown>;
+		if (obj.message && typeof obj.message === "string") {
+			return obj.message;
+		}
+		if (obj.error && typeof obj.error === "string") {
+			return obj.error;
+		}
+	}
+	return "Error desconocido al cargar los clientes";
+}
 
 // Opciones de cantidad de registros
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
@@ -50,6 +74,7 @@ export const ClientsPage: React.FC = () => {
 	const [editingClient, setEditingClient] = useState<Client | null>(null);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+	const [operationError, setOperationError] = useState<string | null>(null);
 
 	const {
 		clients,
@@ -64,6 +89,9 @@ export const ClientsPage: React.FC = () => {
 		isUpdating,
 		isDeleting,
 	} = useClients(page, limit, search, searchField);
+
+	const { user } = useAuth();
+	const isAdmin = user?.role === "ADMINISTRATOR";
 
 	const [formData, setFormData] = useState<CreateClientDto>({
 		firstName: "",
@@ -109,6 +137,7 @@ export const ClientsPage: React.FC = () => {
 			address: "",
 		});
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const openEditDialog = (client: Client) => {
@@ -121,15 +150,18 @@ export const ClientsPage: React.FC = () => {
 			address: client.address || "",
 		});
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const openDeleteDialog = (client: Client) => {
 		setClientToDelete(client);
 		setIsDeleteDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		setOperationError(null);
 		try {
 			if (editingClient) {
 				await updateClient(editingClient.id, formData);
@@ -137,19 +169,26 @@ export const ClientsPage: React.FC = () => {
 				await createClient(formData);
 			}
 			setIsDialogOpen(false);
+			setOperationError(null);
 		} catch (err) {
-			console.error("Error:", err);
+			const errorMessage = getErrorMessage(err);
+			setOperationError(errorMessage);
+			console.error("Error en operación:", err);
 		}
 	};
 
 	const handleDelete = async () => {
 		if (clientToDelete) {
+			setOperationError(null);
 			try {
 				await deleteClient(clientToDelete.id);
 				setIsDeleteDialogOpen(false);
 				setClientToDelete(null);
+				setOperationError(null);
 			} catch (err) {
-				console.error("Error:", err);
+				const errorMessage = getErrorMessage(err);
+				setOperationError(errorMessage);
+				console.error("Error al eliminar:", err);
 			}
 		}
 	};
@@ -184,10 +223,19 @@ export const ClientsPage: React.FC = () => {
 	}
 
 	if (error) {
+		const errorMessage = getErrorMessage(error);
 		return (
-			<div className="flex flex-col items-center justify-center h-[400px] text-destructive">
-				<p className="font-bold">Error al cargar clientes</p>
-				<p className="text-sm">{(error as Error).message}</p>
+			<div className="flex flex-col items-center justify-center h-[400px] gap-4">
+				<div className="flex items-center gap-3 text-destructive">
+					<AlertCircle className="size-6" />
+					<div>
+						<p className="font-bold text-lg">Error al cargar clientes</p>
+						<p className="text-sm text-muted-foreground">{errorMessage}</p>
+					</div>
+				</div>
+				<Button onClick={() => window.location.reload()} variant="outline">
+					Reintentar
+				</Button>
 			</div>
 		);
 	}
@@ -209,12 +257,14 @@ export const ClientsPage: React.FC = () => {
 						</p>
 					</div>
 				</div>
-				<Button
-					onClick={openCreateDialog}
-					className="font-bold uppercase tracking-tight"
-				>
-					<Plus className="mr-2 size-4" /> Nuevo Cliente
-				</Button>
+				{isAdmin && (
+					<Button
+						onClick={openCreateDialog}
+						className="font-bold uppercase tracking-tight"
+					>
+						<Plus className="mr-2 size-4" /> Nuevo Cliente
+					</Button>
+				)}
 			</div>
 
 			{/* Table Card */}
@@ -299,21 +349,25 @@ export const ClientsPage: React.FC = () => {
 										</td>
 										<td className="px-6 py-4 text-center">
 											<div className="flex items-center justify-center gap-1">
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onClick={() => openEditDialog(client)}
-												>
-													<Pencil className="size-4" />
-												</Button>
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onClick={() => openDeleteDialog(client)}
-													className="text-destructive hover:text-destructive"
-												>
-													<Trash2 className="size-4" />
-												</Button>
+												{isAdmin && (
+													<>
+														<Button
+															variant="ghost"
+															size="icon-sm"
+															onClick={() => openEditDialog(client)}
+														>
+															<Pencil className="size-4" />
+														</Button>
+														<Button
+															variant="ghost"
+															size="icon-sm"
+															onClick={() => openDeleteDialog(client)}
+															className="text-destructive hover:text-destructive"
+														>
+															<Trash2 className="size-4" />
+														</Button>
+													</>
+												)}
 											</div>
 										</td>
 									</tr>
@@ -436,30 +490,48 @@ export const ClientsPage: React.FC = () => {
 							{editingClient ? "Editar Cliente" : "Nuevo Cliente"}
 						</DialogTitle>
 					</DialogHeader>
+					{operationError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<AlertCircle className="size-4 flex-shrink-0" />
+							{operationError}
+						</div>
+					)}
 					<form onSubmit={handleSubmit} className="space-y-4">
-						<div className="grid grid-cols-2 gap-4">
-							<div className="space-y-2">
-								<label className="text-sm font-medium">Nombre</label>
-								<Input
-									value={formData.firstName}
-									onChange={(e) =>
-										setFormData({ ...formData, firstName: e.target.value })
-									}
-									required
-									placeholder="Juan"
-								/>
-							</div>
-							<div className="space-y-2">
-								<label className="text-sm font-medium">Apellido</label>
-								<Input
-									value={formData.lastName}
-									onChange={(e) =>
-										setFormData({ ...formData, lastName: e.target.value })
-									}
-									required
-									placeholder="Perez"
-								/>
-							</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Nombre</label>
+							<Input
+								value={formData.firstName}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										firstName: e.target.value.slice(0, 15),
+									})
+								}
+								required
+								placeholder="Juan"
+								maxLength={15}
+							/>
+							<span className="text-xs text-muted-foreground">
+								{formData.firstName.length}/15
+							</span>
+						</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">Apellido</label>
+							<Input
+								value={formData.lastName}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										lastName: e.target.value.slice(0, 15),
+									})
+								}
+								required
+								placeholder="Perez"
+								maxLength={15}
+							/>
+							<span className="text-xs text-muted-foreground">
+								{formData.lastName.length}/15
+							</span>
 						</div>
 						<div className="space-y-2">
 							<label className="text-sm font-medium">Email</label>
@@ -467,31 +539,52 @@ export const ClientsPage: React.FC = () => {
 								type="email"
 								value={formData.email}
 								onChange={(e) =>
-									setFormData({ ...formData, email: e.target.value })
+									setFormData({
+										...formData,
+										email: e.target.value.slice(0, 40),
+									})
 								}
 								required
 								placeholder="juan@email.com"
+								maxLength={40}
 							/>
+							<span className="text-xs text-muted-foreground">
+								{formData.email.length}/40
+							</span>
 						</div>
 						<div className="space-y-2">
-							<label className="text-sm font-medium">Telefono</label>
+							<label className="text-sm font-medium">
+								Telefono (solo numeros)
+							</label>
 							<Input
 								value={formData.phone}
-								onChange={(e) =>
-									setFormData({ ...formData, phone: e.target.value })
-								}
-								placeholder="+57 300 123 4567"
+								onChange={(e) => {
+									const num = e.target.value.replace(/\D/g, "").slice(0, 10);
+									setFormData({ ...formData, phone: num });
+								}}
+								placeholder="0991234567"
+								maxLength={10}
 							/>
+							<span className="text-xs text-muted-foreground">
+								{(formData.phone || "").length}/10 numeros
+							</span>
 						</div>
 						<div className="space-y-2">
 							<label className="text-sm font-medium">Direccion</label>
 							<Input
 								value={formData.address}
 								onChange={(e) =>
-									setFormData({ ...formData, address: e.target.value })
+									setFormData({
+										...formData,
+										address: e.target.value.slice(0, 50),
+									})
 								}
 								placeholder="Calle 123 #45-67"
+								maxLength={50}
 							/>
+							<span className="text-xs text-muted-foreground">
+								{(formData.address || "").length}/50
+							</span>
 						</div>
 						<DialogFooter>
 							<Button
@@ -524,6 +617,12 @@ export const ClientsPage: React.FC = () => {
 					<DialogHeader>
 						<DialogTitle>Eliminar Cliente</DialogTitle>
 					</DialogHeader>
+					{operationError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<AlertCircle className="size-4 flex-shrink-0" />
+							{operationError}
+						</div>
+					)}
 					<p className="text-sm text-muted-foreground">
 						Seguro que deseas eliminar a{" "}
 						<strong>

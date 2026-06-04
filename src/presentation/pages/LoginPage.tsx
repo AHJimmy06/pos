@@ -14,10 +14,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ShoppingCart, LogIn, AlertCircle } from "lucide-react";
+import type { AxiosResponse } from "axios";
 
-interface LoginResponse {
+interface LoginPayload {
 	accessToken: string;
 	expiresIn: number;
+}
+
+interface LoginApiResponse {
+	success: boolean;
+	statusCode: number;
+	timestamp: string;
+	path: string;
+	data: LoginPayload;
 }
 
 interface LocationState {
@@ -27,22 +36,16 @@ interface LocationState {
 }
 
 // Helper para extraer payload de respuestas NestJS
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPayload<T>(response: any): T | null {
+function getPayload<T>(response: AxiosResponse): T | null {
 	const data = response?.data;
 	if (!data) return null;
+
+	// Si tiene estructura NestJS wrapper { success, data: ... }
 	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
-			return inner as T;
-		}
-		return inner as T;
+		return data.data as T;
 	}
+
+	// Si no tiene wrapper
 	return data as T;
 }
 
@@ -65,16 +68,22 @@ export const LoginPage: React.FC = () => {
 
 		try {
 			// Llamada al endpoint de la API
-			const response = await apiClient.post<unknown, LoginResponse>(
+			const response = await apiClient.post<LoginApiResponse>(
 				"/auth/login",
 				{ email, password },
 			);
-			const payload = getPayload<LoginResponse>(response);
-			if (!payload) throw new Error("Credenciales inválidas");
+
+			const payload = getPayload<LoginPayload>(response);
+			if (!payload?.accessToken) {
+				throw new Error("Token no recibido del servidor");
+			}
 
 			const { accessToken } = payload;
 
-			// Simulación de usuario basado en roles comunes para la demo
+			// Guardar token en localStorage antes de crear usuario
+			localStorage.setItem("pos_token", accessToken);
+
+			// Crear usuario basado en el email
 			const mockUser = {
 				id: "1",
 				username: email.split("@")[0],
@@ -86,11 +95,15 @@ export const LoginPage: React.FC = () => {
 					: "Vendedor Usuario",
 			};
 
+			// Llamar a login del context
 			login(accessToken, mockUser);
+
+			// Navegar después de guardar todo
 			navigate(from, { replace: true });
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Credenciales inválidas";
+			console.error("Login error:", errorMessage);
 			setError(errorMessage);
 		} finally {
 			setIsSubmitting(false);

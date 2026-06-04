@@ -3,11 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./presentation/context/AuthContext";
 import { ApplicationProvider } from "./presentation/context/application-provider";
 import { ProtectedRoute } from "./presentation/components/ProtectedRoute";
-import { DashboardLayout } from "./presentation/components/DashboardLayout";
+import { AppLayout } from "./presentation/components/AppLayout";
 
 // Páginas
 import { LoginPage } from "./presentation/pages/LoginPage";
-import { DashboardPage } from "./presentation/pages/DashboardPage";
 import { POSPage } from "./presentation/pages/POSPage";
 import { ProductsPage } from "./presentation/pages/ProductsPage";
 import { UsersPage } from "./presentation/pages/UsersPage";
@@ -36,26 +35,17 @@ function App() {
 							{/* Ruta Pública: Login */}
 							<Route path="/login" element={<LoginPage />} />
 
-							{/* Rutas Privadas: Dashboard Layout */}
+							{/* Rutas Privadas: App Layout */}
 							<Route
 								path="/"
 								element={
 									<ProtectedRoute>
-										<DashboardLayout />
+										<AppLayout />
 									</ProtectedRoute>
 								}
 							>
 								{/* Redirección inicial según rol podría hacerse en un componente Home */}
 								<Route index element={<Navigate to="/pos" replace />} />
-
-								<Route
-									path="dashboard"
-									element={
-										<ProtectedRoute allowedRoles={["ADMINISTRATOR"]}>
-											<DashboardPage />
-										</ProtectedRoute>
-									}
-								/>
 
 								<Route path="pos" element={<POSPage />} />
 

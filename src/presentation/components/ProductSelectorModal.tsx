@@ -1,11 +1,16 @@
-import React, { useState } from "react";
-import { useProducts } from "../hooks/useProducts";
+import React, { useState, useMemo } from "react";
+import { useProducts, type SearchField } from "../hooks/useProducts";
 import { useTaxes } from "../hooks/usePOS";
 import { usePOSStore } from "../store/usePOSStore";
 import { useApplication } from "../context/use-application";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+	DropdownSelector,
+	type DropdownOption,
+} from "@/components/ui/dropdown-selector";
+import { Product as ProductEntity } from "../../domain/entities/product.entity";
 import {
 	Package,
 	Search,
@@ -16,17 +21,29 @@ import {
 	Plus,
 } from "lucide-react";
 
+const cn = (...classes: (string | boolean | undefined)[]) =>
+	classes.filter(Boolean).join(" ");
+
 interface ProductSelectorModalProps {
 	triggerClassName?: string;
 }
+
+const SEARCH_FIELD_LABELS: Record<string, string> = {
+	all: "Todos",
+	id: "ID",
+	name: "Nombre",
+	stock: "Stock",
+};
 
 export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	triggerClassName,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [page, setPage] = useState(1);
+	const [limit] = useState(10);
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
+	const [searchField, setSearchField] = useState<SearchField>("all");
 	const [currentPageInput, setCurrentPageInput] = useState("");
 
 	const { selectedClient, setInvoice } = usePOSStore();
@@ -34,8 +51,9 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 
 	const { products, total, totalPages, isLoading } = useProducts(
 		page,
-		15,
+		limit,
 		search,
+		searchField,
 	);
 
 	// Get taxes for adding to products
@@ -43,26 +61,12 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	const taxes =
 		(taxesData as any)?.taxes || (taxesData as any)?.data || taxesData || [];
 
-	// Adapt products - keep as plain numbers for domain to wrap
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const adaptedProducts: any[] = (products || []).map((p) => {
-		const stockValue =
-			typeof p.stock === "object" && "value" in p.stock
-				? (p.stock as { value: number }).value
-				: (p.stock as number);
-		const priceValue =
-			typeof p.price === "object" && "value" in p.price
-				? (p.price as { value: number }).value
-				: (p.price as number);
-		return {
-			...p,
-			// Pass as plain numbers - domain will wrap in Money/StockQuantity
-			stock: stockValue,
-			price: priceValue,
-			hasStock: stockValue > 0,
-			canSell: (quantity: number) => stockValue >= quantity && p.isActive,
-		};
-	});
+	const formatCurrency = (value: number) =>
+		new Intl.NumberFormat("es-CO", {
+			style: "currency",
+			currency: "COP",
+			minimumFractionDigits: 0,
+		}).format(value);
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -79,22 +83,30 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 		setCurrentPageInput("");
 	};
 
-	const handleAddProduct = (product: (typeof adaptedProducts)[0]) => {
-		if (!product.hasStock || !selectedClient) return;
+	const handleAddProduct = (product: any) => {
+		const stockValue = product.stock || 0;
+		if (stockValue <= 0 || !selectedClient) return;
 
-		// Get current invoice from store
 		const currentInvoice = usePOSStore.getState().currentInvoice;
 		if (!currentInvoice) return;
 
 		try {
-			// Filter taxes for this product
 			const productTaxes = (taxes || []).filter((t: { id: number }) =>
-				(product as any).taxIds?.includes(t.id),
+				product.taxIds?.includes(t.id),
 			);
+
+			// Rehidratar la entidad de dominio para que tenga sus métodos (canSell, etc)
+			const productEntity = new ProductEntity(
+				product.id,
+				product.name,
+				product.price,
+				product.stock,
+			);
+			productEntity.taxIds = product.taxIds || [];
 
 			const updatedInvoice = useCases.addItem.execute(
 				currentInvoice,
-				product as any,
+				productEntity,
 				1,
 				productTaxes,
 			);
@@ -129,24 +141,33 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 		return pageList;
 	};
 
-	const formatCurrency = (value: number) =>
-		new Intl.NumberFormat("es-CO", {
-			style: "currency",
-			currency: "COP",
-			minimumFractionDigits: 0,
-		}).format(value);
+	const searchOptions: DropdownOption[] = useMemo(
+		() =>
+			Object.entries(SEARCH_FIELD_LABELS).map(([id, label]) => ({
+				id,
+				label,
+			})),
+		[],
+	);
+
+	const selectedSearchFieldOption = useMemo(
+		() =>
+			searchOptions.find((opt) => opt.id === searchField) || searchOptions[0],
+		[searchField, searchOptions],
+	);
 
 	return (
 		<>
-			{/* Trigger */}
 			<button
 				onClick={() => selectedClient && setIsOpen(true)}
 				disabled={!selectedClient}
-				className={`w-full p-3 border-2 border-dashed rounded-xl text-center transition-all ${
+				className={cn(
+					"w-full p-3 border-2 border-dashed rounded-xl text-center transition-all",
 					!selectedClient
 						? "opacity-60 cursor-not-allowed border-muted"
-						: "border-muted hover:border-primary/30 hover:bg-muted/20"
-				} ${triggerClassName || ""}`}
+						: "border-muted hover:border-primary/30 hover:bg-muted/20",
+					triggerClassName,
+				)}
 			>
 				<p className="text-[10px] font-medium text-muted-foreground italic">
 					{selectedClient
@@ -155,29 +176,25 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 				</p>
 			</button>
 
-			{/* Modal */}
 			{isOpen && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center">
-					{/* Backdrop */}
+				<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 					<div
-						className="absolute inset-0 bg-black/50"
+						className="absolute inset-0 bg-black/50 backdrop-blur-sm"
 						onClick={() => setIsOpen(false)}
 					/>
 
-					{/* Modal Content */}
-					<div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden m-4">
-						{/* Header */}
-						<div className="flex items-center justify-between p-6 border-b border-border">
+					<div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-border">
+						<div className="flex items-center justify-between p-6 border-b border-border bg-background">
 							<div className="flex items-center gap-3">
 								<div className="bg-primary p-2 rounded-lg text-primary-foreground">
 									<Package className="size-5" />
 								</div>
 								<div>
-									<h2 className="text-xl font-black tracking-tight">
+									<h2 className="text-xl font-black tracking-tight uppercase">
 										Agregar Productos
 									</h2>
-									<p className="text-sm text-muted-foreground">
-										Busca y selecciona productos ({total} disponibles)
+									<p className="text-xs text-muted-foreground font-medium">
+										Catálogo de productos ({total} disponibles)
 									</p>
 								</div>
 							</div>
@@ -189,26 +206,41 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 							</button>
 						</div>
 
-						{/* Search */}
-						<div className="p-4 border-b border-border bg-muted/20">
-							<form onSubmit={handleSearch} className="flex gap-2">
-								<div className="relative flex-1">
-									<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-									<Input
-										placeholder="Buscar por nombre o ID..."
-										value={searchInput}
-										onChange={(e) => setSearchInput(e.target.value)}
-										className="pl-10"
+						<div className="p-4 border-b border-border bg-muted/20 space-y-4">
+							<form
+								onSubmit={handleSearch}
+								className="flex gap-2 items-center flex-wrap"
+							>
+								<div className="w-64 shrink-0">
+									<DropdownSelector
+										options={searchOptions}
+										selected={selectedSearchFieldOption}
+										onSelect={(opt) => {
+											setSearchField(opt.id as SearchField);
+											setSearch("");
+											setSearchInput("");
+										}}
+										placeholder="Filtrar por..."
+										triggerHeight="sm"
 									/>
 								</div>
-								<Button type="submit" variant="secondary" size="sm">
+								<div className="relative flex-1 min-w-[200px]">
+									<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+									<Input
+										placeholder={`Buscar por ${SEARCH_FIELD_LABELS[searchField].toLowerCase()}...`}
+										value={searchInput}
+										onChange={(e) => setSearchInput(e.target.value)}
+										className="pl-10 h-10"
+									/>
+								</div>
+								<Button type="submit" variant="secondary" className="h-10">
 									Buscar
 								</Button>
-								{search && (
+								{(search || searchInput) && (
 									<Button
 										type="button"
 										variant="ghost"
-										size="sm"
+										className="h-10"
 										onClick={() => {
 											setSearch("");
 											setSearchInput("");
@@ -221,77 +253,97 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 							</form>
 						</div>
 
-						{/* Product List */}
-						<div className="flex-1 overflow-y-auto p-4">
+						<div className="flex-1 overflow-auto p-4 bg-background">
 							{isLoading ? (
 								<div className="flex items-center justify-center h-64">
 									<Loader2 className="size-8 animate-spin text-primary" />
 								</div>
-							) : adaptedProducts.length === 0 ? (
-								<div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-									<Package className="size-12 mb-4 opacity-30" />
-									<p className="font-medium">No se encontraron productos</p>
-								</div>
 							) : (
-								<div className="space-y-2">
-									{adaptedProducts.map((product) => (
-										<div
-											key={product.id}
-											className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-												!product.hasStock
-													? "border-border opacity-50"
-													: "border-border hover:border-primary/30 hover:bg-muted/50"
-											}`}
-										>
-											<div className="size-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground font-bold text-xs shrink-0">
-												#{product.id}
-											</div>
-											<div className="flex-1 min-w-0">
-												<div className="flex items-center gap-2">
-													<p className="text-sm font-bold truncate">
-														{product.name}
-													</p>
-													{!product.hasStock && (
-														<Badge variant="destructive" className="text-[9px]">
-															Agotado
-														</Badge>
-													)}
-												</div>
-												<p className="text-xs text-muted-foreground">
-													Stock: {product.stock} unidades
-												</p>
-											</div>
-											<div className="text-right shrink-0">
-												<p className="text-sm font-bold text-primary">
-													{formatCurrency(product.price)}
-												</p>
-												{product.hasStock && (
-													<Button
-														size="sm"
-														className="mt-1 h-7 text-xs"
-														onClick={() => handleAddProduct(product)}
+								<div className="relative overflow-x-auto rounded-xl border border-border/50">
+									<table className="w-full text-sm text-left">
+										<thead className="text-[10px] text-muted-foreground uppercase bg-muted/50 font-black tracking-widest">
+											<tr>
+												<th className="px-6 py-4">Nombre</th>
+												<th className="px-6 py-4 text-right">Precio</th>
+												<th className="px-6 py-4 text-center">Stock</th>
+												<th className="px-6 py-4 text-center">Acciones</th>
+											</tr>
+										</thead>
+										<tbody className="divide-y divide-border/50">
+											{(products || []).map((product) => {
+												const hasStock = (product.stock || 0) > 0;
+												return (
+													<tr
+														key={product.id}
+														className={cn(
+															"bg-transparent hover:bg-muted/30 transition-colors",
+															!hasStock && "opacity-60",
+														)}
 													>
-														<Plus className="size-3 mr-1" />
-														Agregar
-													</Button>
-												)}
-											</div>
-										</div>
-									))}
+														<td className="px-6 py-4">
+															<p className="font-bold text-foreground">
+																{product.name}
+															</p>
+														</td>
+														<td className="px-6 py-4 text-right">
+															<p className="font-mono font-bold text-primary">
+																{formatCurrency(product.price)}
+															</p>
+														</td>
+														<td className="px-6 py-4 text-center">
+															<span
+																className={cn(
+																	"px-2 py-0.5 rounded text-[10px] font-black uppercase",
+																	!hasStock
+																		? "bg-destructive/10 text-destructive"
+																		: (product.stock || 0) <= 5
+																			? "bg-amber-500/10 text-amber-600"
+																			: "bg-emerald-500/10 text-emerald-600",
+																)}
+															>
+																{hasStock ? product.stock : "Agotado"}
+															</span>
+														</td>
+														<td className="px-6 py-4 text-center">
+															<Button
+																size="sm"
+																className="h-8 text-[10px] font-black uppercase tracking-tight"
+																disabled={!hasStock}
+																onClick={() => handleAddProduct(product)}
+															>
+																<Plus className="size-3 mr-1" />
+																Agregar
+															</Button>
+														</td>
+													</tr>
+												);
+											})}
+											{(products || []).length === 0 && (
+												<tr>
+													<td
+														colSpan={4}
+														className="px-6 py-10 text-center text-muted-foreground italic font-medium"
+													>
+														No se encontraron productos
+													</td>
+												</tr>
+											)}
+										</tbody>
+									</table>
 								</div>
 							)}
 						</div>
 
-						{/* Pagination */}
 						{totalPages > 1 && (
-							<div className="flex flex-wrap items-center justify-between p-4 border-t border-border bg-muted/20 gap-4">
-								<p className="text-sm text-muted-foreground">
-									Pagina {page} de {totalPages} ({total} productos)
+							<div className="flex flex-wrap items-center justify-between p-4 border-t border-border bg-muted/10 gap-4">
+								<p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+									Página {page} de {totalPages} ({total} items)
 								</p>
 								<div className="flex items-center gap-2">
 									<Button
 										variant="outline"
 										size="sm"
+										className="h-8"
 										onClick={() => setPage((p) => Math.max(1, p - 1))}
 										disabled={page === 1}
 									>
@@ -313,7 +365,7 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 													variant={page === p ? "default" : "ghost"}
 													size="sm"
 													onClick={() => setPage(p)}
-													className="w-9"
+													className="h-8 w-8 text-xs font-bold"
 												>
 													{p}
 												</Button>
@@ -324,6 +376,7 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 									<Button
 										variant="outline"
 										size="sm"
+										className="h-8"
 										onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
 										disabled={page === totalPages}
 									>
@@ -342,9 +395,13 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 											placeholder="Pg"
 											value={currentPageInput}
 											onChange={(e) => setCurrentPageInput(e.target.value)}
-											className="w-16 h-8 text-center"
+											className="w-14 h-8 text-center text-xs p-0"
 										/>
-										<Button type="submit" variant="secondary" size="sm">
+										<Button
+											type="submit"
+											variant="secondary"
+											className="h-8 text-xs px-2 font-bold"
+										>
 											Ir
 										</Button>
 									</form>

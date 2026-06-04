@@ -7,7 +7,6 @@ import {
 	Package,
 	Settings,
 	LogOut,
-	LayoutDashboard,
 	Percent,
 	ChevronRight,
 	FileText,
@@ -24,27 +23,27 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
 	{
-		title: "Dashboard",
-		path: "/dashboard",
-		icon: LayoutDashboard,
-		roles: ["ADMINISTRATOR"],
-	},
-	{
 		title: "Punto de Venta",
 		path: "/pos",
 		icon: ShoppingCart,
 		roles: ["ADMINISTRATOR", "SELLER"],
 	},
 	{
-		title: "Productos",
-		path: "/products",
-		icon: Package,
-		roles: ["ADMINISTRATOR"],
-	},
-	{
 		title: "Clientes",
 		path: "/clients",
 		icon: Users,
+		roles: ["ADMINISTRATOR", "SELLER"],
+	},
+	{
+		title: "Facturas",
+		path: "/invoices",
+		icon: FileText,
+		roles: ["ADMINISTRATOR", "SELLER"],
+	},
+	{
+		title: "Productos",
+		path: "/products",
+		icon: Package,
 		roles: ["ADMINISTRATOR"],
 	},
 	{
@@ -57,12 +56,6 @@ const sidebarItems: SidebarItem[] = [
 		title: "Impuestos",
 		path: "/taxes",
 		icon: Percent,
-		roles: ["ADMINISTRATOR"],
-	},
-	{
-		title: "Facturas",
-		path: "/invoices",
-		icon: FileText,
 		roles: ["ADMINISTRATOR"],
 	},
 	{
