@@ -26,7 +26,30 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Users,
+	AlertCircle,
 } from "lucide-react";
+
+/**
+ * Extrae un mensaje de error legible de diferentes tipos de errores
+ */
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	if (typeof error === "object" && error !== null) {
+		const obj = error as Record<string, unknown>;
+		if (obj.message && typeof obj.message === "string") {
+			return obj.message;
+		}
+		if (obj.error && typeof obj.error === "string") {
+			return obj.error;
+		}
+	}
+	return "Error desconocido al cargar los clientes";
+}
 
 // Opciones de cantidad de registros
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
@@ -51,6 +74,7 @@ export const ClientsPage: React.FC = () => {
 	const [editingClient, setEditingClient] = useState<Client | null>(null);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+	const [operationError, setOperationError] = useState<string | null>(null);
 
 	const {
 		clients,
@@ -113,6 +137,7 @@ export const ClientsPage: React.FC = () => {
 			address: "",
 		});
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const openEditDialog = (client: Client) => {
@@ -125,15 +150,18 @@ export const ClientsPage: React.FC = () => {
 			address: client.address || "",
 		});
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const openDeleteDialog = (client: Client) => {
 		setClientToDelete(client);
 		setIsDeleteDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		setOperationError(null);
 		try {
 			if (editingClient) {
 				await updateClient(editingClient.id, formData);
@@ -141,19 +169,26 @@ export const ClientsPage: React.FC = () => {
 				await createClient(formData);
 			}
 			setIsDialogOpen(false);
+			setOperationError(null);
 		} catch (err) {
-			console.error("Error:", err);
+			const errorMessage = getErrorMessage(err);
+			setOperationError(errorMessage);
+			console.error("Error en operación:", err);
 		}
 	};
 
 	const handleDelete = async () => {
 		if (clientToDelete) {
+			setOperationError(null);
 			try {
 				await deleteClient(clientToDelete.id);
 				setIsDeleteDialogOpen(false);
 				setClientToDelete(null);
+				setOperationError(null);
 			} catch (err) {
-				console.error("Error:", err);
+				const errorMessage = getErrorMessage(err);
+				setOperationError(errorMessage);
+				console.error("Error al eliminar:", err);
 			}
 		}
 	};
@@ -188,10 +223,19 @@ export const ClientsPage: React.FC = () => {
 	}
 
 	if (error) {
+		const errorMessage = getErrorMessage(error);
 		return (
-			<div className="flex flex-col items-center justify-center h-[400px] text-destructive">
-				<p className="font-bold">Error al cargar clientes</p>
-				<p className="text-sm">{(error as Error).message}</p>
+			<div className="flex flex-col items-center justify-center h-[400px] gap-4">
+				<div className="flex items-center gap-3 text-destructive">
+					<AlertCircle className="size-6" />
+					<div>
+						<p className="font-bold text-lg">Error al cargar clientes</p>
+						<p className="text-sm text-muted-foreground">{errorMessage}</p>
+					</div>
+				</div>
+				<Button onClick={() => window.location.reload()} variant="outline">
+					Reintentar
+				</Button>
 			</div>
 		);
 	}
@@ -446,6 +490,12 @@ export const ClientsPage: React.FC = () => {
 							{editingClient ? "Editar Cliente" : "Nuevo Cliente"}
 						</DialogTitle>
 					</DialogHeader>
+					{operationError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<AlertCircle className="size-4 flex-shrink-0" />
+							{operationError}
+						</div>
+					)}
 					<form onSubmit={handleSubmit} className="space-y-4">
 						<div className="space-y-2">
 							<label className="text-sm font-medium">Nombre</label>
@@ -567,6 +617,12 @@ export const ClientsPage: React.FC = () => {
 					<DialogHeader>
 						<DialogTitle>Eliminar Cliente</DialogTitle>
 					</DialogHeader>
+					{operationError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<AlertCircle className="size-4 flex-shrink-0" />
+							{operationError}
+						</div>
+					)}
 					<p className="text-sm text-muted-foreground">
 						Seguro que deseas eliminar a{" "}
 						<strong>

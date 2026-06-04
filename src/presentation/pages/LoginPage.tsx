@@ -13,11 +13,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ShoppingCart, LogIn, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ShoppingCart, LogIn, AlertCircle } from "lucide-react";
+import type { AxiosResponse } from "axios";
 
-interface LoginResponse {
+interface LoginPayload {
 	accessToken: string;
 	expiresIn: number;
+}
+
+interface LoginApiResponse {
+	success: boolean;
+	statusCode: number;
+	timestamp: string;
+	path: string;
+	data: LoginPayload;
 }
 
 interface LocationState {
@@ -27,29 +36,22 @@ interface LocationState {
 }
 
 // Helper para extraer payload de respuestas NestJS
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPayload<T>(response: any): T | null {
+function getPayload<T>(response: AxiosResponse): T | null {
 	const data = response?.data;
 	if (!data) return null;
+
+	// Si tiene estructura NestJS wrapper { success, data: ... }
 	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
-			return inner as T;
-		}
-		return inner as T;
+		return data.data as T;
 	}
+
+	// Si no tiene wrapper
 	return data as T;
 }
 
 export const LoginPage: React.FC = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -66,16 +68,22 @@ export const LoginPage: React.FC = () => {
 
 		try {
 			// Llamada al endpoint de la API
-			const response = await apiClient.post<unknown, LoginResponse>(
+			const response = await apiClient.post<LoginApiResponse>(
 				"/auth/login",
 				{ email, password },
 			);
-			const payload = getPayload<LoginResponse>(response);
-			if (!payload) throw new Error("Credenciales inválidas");
+
+			const payload = getPayload<LoginPayload>(response);
+			if (!payload?.accessToken) {
+				throw new Error("Token no recibido del servidor");
+			}
 
 			const { accessToken } = payload;
 
-			// Simulación de usuario basado en roles comunes para la demo
+			// Guardar token en localStorage antes de crear usuario
+			localStorage.setItem("pos_token", accessToken);
+
+			// Crear usuario basado en el email
 			const mockUser = {
 				id: "1",
 				username: email.split("@")[0],
@@ -87,11 +95,15 @@ export const LoginPage: React.FC = () => {
 					: "Vendedor Usuario",
 			};
 
+			// Llamar a login del context
 			login(accessToken, mockUser);
+
+			// Navegar después de guardar todo
 			navigate(from, { replace: true });
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Credenciales inválidas";
+			console.error("Login error:", errorMessage);
 			setError(errorMessage);
 		} finally {
 			setIsSubmitting(false);
@@ -134,48 +146,26 @@ export const LoginPage: React.FC = () => {
 							)}
 							<div className="space-y-2">
 								<Label htmlFor="email">Correo Electrónico</Label>
-								<div className="relative">
-									<Input
-										id="email"
-										type="email"
-										placeholder="admin@gentleman.com"
-										value={email}
-										onChange={(e) => setEmail(e.target.value.slice(0, 40))}
-										required
-										className="bg-background/50 pr-10"
-										maxLength={40}
-									/>
-									<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-										{email.length}/40
-									</span>
-								</div>
+								<Input
+									id="email"
+									type="email"
+									placeholder="admin@gentleman.com"
+									value={email}
+									onChange={(e) => setEmail(e.target.value)}
+									required
+									className="bg-background/50"
+								/>
 							</div>
 							<div className="space-y-2">
 								<Label htmlFor="password">Contraseña</Label>
-								<div className="relative">
-									<Input
-										id="password"
-										type={showPassword ? "text" : "password"}
-										value={password}
-										onChange={(e) => setPassword(e.target.value)}
-										required
-										className="bg-background/50 pr-10"
-									/>
-									<button
-										type="button"
-										onClick={() => setShowPassword(!showPassword)}
-										className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-										aria-label={
-											showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-										}
-									>
-										{showPassword ? (
-											<EyeOff className="size-4" />
-										) : (
-											<Eye className="size-4" />
-										)}
-									</button>
-								</div>
+								<Input
+									id="password"
+									type="password"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									required
+									className="bg-background/50"
+								/>
 							</div>
 						</CardContent>
 						<CardFooter>

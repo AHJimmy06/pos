@@ -29,6 +29,34 @@ interface PaginatedResponse<T> {
 	total: number;
 }
 
+// Helper para extraer payload de respuestas NestJS
+function getPayload<T>(response: unknown): T | null {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const res = response as any;
+	const data = res?.data;
+
+	if (!data) return null;
+
+	// Si tiene estructura NestJS wrapper { success, data: ... }
+	if (data.success !== undefined && data.data !== undefined) {
+		const inner = data.data;
+		// Si es paginado
+		if (
+			inner &&
+			typeof inner === "object" &&
+			"data" in inner &&
+			"total" in inner
+		) {
+			return inner as T;
+		}
+		// Si es simple
+		return inner as T;
+	}
+
+	// Si no tiene wrapper
+	return data as T;
+}
+
 export type SearchField = "all" | "id" | "name" | "email" | "phone";
 
 interface UseClientsResult {
@@ -66,16 +94,34 @@ export const useClients = (
 				params.append("search", search);
 				params.append("searchField", searchField);
 			}
-			const response = await apiClient.get<PaginatedResponse<Client>>(`/clients?${params}`);
-			return response.data ?? { data: [], total: 0 };
+			const response = await apiClient.get(`/clients?${params}`);
+			// Extraer el payload correctamente
+			const payload = getPayload<PaginatedResponse<Client>>(response);
+			
+			// Validar que sea un objeto con estructura correcta
+			if (
+				payload &&
+				typeof payload === "object" &&
+				"data" in payload &&
+				Array.isArray(payload.data)
+			) {
+				return payload;
+			}
+
+			// Si no es válido, retornar estructura por defecto
+			return {
+				data: [],
+				total: 0,
+			};
 		},
 	});
 
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateClientDto): Promise<Client> => {
-			const response = await apiClient.post<Client>("/clients", data);
-			if (!response.data) throw new Error("Error al crear cliente");
-			return response.data;
+			const response = await apiClient.post("/clients", data);
+			const payload = getPayload<Client>(response);
+			if (!payload) throw new Error("Error al crear cliente");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -90,9 +136,10 @@ export const useClients = (
 			id: number;
 			data: UpdateClientDto;
 		}): Promise<Client> => {
-			const response = await apiClient.put<Client>(`/clients/${id}`, data);
-			if (!response.data) throw new Error("Error al actualizar cliente");
-			return response.data;
+			const response = await apiClient.put(`/clients/${id}`, data);
+			const payload = getPayload<Client>(response);
+			if (!payload) throw new Error("Error al actualizar cliente");
+			return payload;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -108,18 +155,20 @@ export const useClients = (
 		},
 	});
 
+	// Garantizar que siempre retornamos un array válido
+	const clientsData = clientsQuery.data ?? { data: [], total: 0 };
+	const clientsArray = Array.isArray(clientsData?.data) ? clientsData.data : [];
+
 	return {
-		clients: ((clientsQuery.data as PaginatedResponse<Client>)?.data ?? []).map(
-			(c) => ({
-				...c,
-				get fullName() {
-					return `${c.firstName} ${c.lastName}`;
-				},
-			}),
-		),
-		total: (clientsQuery.data as PaginatedResponse<Client>)?.total ?? 0,
+		clients: clientsArray.map((c) => ({
+			...c,
+			get fullName() {
+				return `${c.firstName} ${c.lastName}`;
+			},
+		})),
+		total: (clientsData?.total as number) ?? 0,
 		totalPages: Math.ceil(
-			((clientsQuery.data as PaginatedResponse<Client>)?.total ?? 0) / limit,
+			((clientsData?.total as number) ?? 0) / limit,
 		),
 		limit,
 		isLoading: clientsQuery.isLoading,

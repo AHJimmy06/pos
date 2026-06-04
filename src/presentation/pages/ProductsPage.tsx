@@ -33,7 +33,7 @@ const cn = (...classes: (string | boolean | undefined)[]) =>
 const formatCurrency = (value: number): string => {
 	return new Intl.NumberFormat("es-CO", {
 		style: "currency",
-		currency: "COP",
+		currency: "USD",
 		minimumFractionDigits: 0,
 		maximumFractionDigits: 0,
 	}).format(value);
@@ -467,7 +467,7 @@ export const ProductsPage: React.FC = () => {
 						</div>
 						<div className="grid grid-cols-2 gap-4">
 							<div className="space-y-2">
-								<label className="text-sm font-medium">Precio (COP)</label>
+								<label className="text-sm font-medium">Precio (USD)</label>
 								<Input
 									type="number"
 									min={0}
