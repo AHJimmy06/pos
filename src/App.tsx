@@ -13,6 +13,7 @@ import { UsersPage } from "./presentation/pages/UsersPage";
 import { ClientsPage } from "./presentation/pages/ClientsPage";
 import { TaxesPage } from "./presentation/pages/TaxesPage";
 import { InvoicesPage } from "./presentation/pages/InvoicesPage";
+import { AuditSalesPage } from "./presentation/pages/AuditSalesPage";
 
 import "./index.css";
 
@@ -68,9 +69,17 @@ function App() {
 								/>
 
 								<Route path="clients" element={<ClientsPage />} />
-								<Route path="invoices" element={<InvoicesPage />} />
-								<Route path="taxes" element={<TaxesPage />} />
-								<Route
+					<Route path="invoices" element={<InvoicesPage />} />
+					<Route
+						path="audit/sales"
+						element={
+							<ProtectedRoute allowedRoles={["ADMINISTRATOR", "AUDITOR"]}>
+								<AuditSalesPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route path="taxes" element={<TaxesPage />} />
+					<Route
 									path="settings"
 									element={
 										<div className="p-8 text-center font-bold">

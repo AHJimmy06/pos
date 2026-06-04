@@ -54,7 +54,7 @@ export const UsersPage: React.FC = () => {
 		lastName: "",
 		email: "",
 		password: "",
-		role: "SELLER",
+		roles: ["SELLER"],
 	});
 
 	const queryClient = useQueryClient();
@@ -85,7 +85,7 @@ export const UsersPage: React.FC = () => {
 			lastName: "",
 			email: "",
 			password: "",
-			role: "SELLER",
+			roles: ["SELLER"],
 		});
 		setIsDialogOpen(true);
 	};
@@ -100,6 +100,7 @@ export const UsersPage: React.FC = () => {
 				lastName: formData.lastName,
 				email: formData.email,
 				password: formData.password,
+				roles: formData.roles,
 			});
 			setIsDialogOpen(false);
 			queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -493,14 +494,15 @@ export const UsersPage: React.FC = () => {
 						<div className="space-y-2">
 							<label className="text-sm font-medium">Rol</label>
 							<select
-								value={formData.role}
+								value={formData.roles[0]}
 								onChange={(e) =>
-									setFormData({ ...formData, role: e.target.value })
+									setFormData({ ...formData, roles: [e.target.value] })
 								}
 								className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
 							>
 								<option value="SELLER">Vendedor</option>
 								<option value="ADMINISTRATOR">Administrador</option>
+								<option value="AUDITOR">Auditor</option>
 							</select>
 						</div>
 						<DialogFooter>

@@ -10,6 +10,7 @@ import {
 	Percent,
 	ChevronRight,
 	FileText,
+	Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,12 @@ const sidebarItems: SidebarItem[] = [
 		path: "/invoices",
 		icon: FileText,
 		roles: ["ADMINISTRATOR", "SELLER"],
+	},
+	{
+		title: "Auditoría",
+		path: "/audit/sales",
+		icon: Search,
+		roles: ["ADMINISTRATOR", "AUDITOR"],
 	},
 	{
 		title: "Productos",
@@ -106,7 +113,11 @@ export const Sidebar: React.FC = () => {
 							{user?.fullName}
 						</p>
 						<p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70">
-							{user?.role === "ADMINISTRATOR" ? "Admin" : "Vendedor"}
+							{user?.role === "ADMINISTRATOR"
+							? "Admin"
+							: user?.role === "AUDITOR"
+							? "Auditor"
+							: "Vendedor"}
 						</p>
 					</div>
 				</div>
