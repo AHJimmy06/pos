@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useInvoices, type Invoice } from "../hooks/useInvoices";
+import { apiClient } from "@/infrastructure/api/api-client";
 import { useAuth } from "../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,9 +66,21 @@ export const InvoicesPage: React.FC = () => {
 		setCurrentPageInput("");
 	};
 
-	const openDetails = (invoice: Invoice) => {
-		setSelectedInvoice(invoice);
+	const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+	const openDetails = async (invoice: Invoice) => {
 		setIsDetailsOpen(true);
+		setIsLoadingDetails(true);
+
+		try {
+			const response = await apiClient.get<Invoice>(`/invoices/${invoice.id}`);
+			setSelectedInvoice(response.data);
+		} catch (err) {
+			console.error("Error cargando detalles:", err);
+			setSelectedInvoice(invoice);
+		} finally {
+			setIsLoadingDetails(false);
+		}
 	};
 
 	const handleCancel = async (invoice: Invoice) => {
@@ -352,10 +365,72 @@ export const InvoicesPage: React.FC = () => {
 			<Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
 				<DialogContent className="max-h-[90vh] overflow-y-auto w-auto max-w-[95vw]">
 					<DialogHeader>
-						<DialogTitle>Factura #{selectedInvoice?.id}</DialogTitle>
+						<DialogTitle>
+							{isLoadingDetails ? (
+								<Loader2 className="size-4 animate-spin inline ml-2" />
+							) : (
+								<span>Factura #{selectedInvoice?.id}</span>
+							)}
+						</DialogTitle>
 					</DialogHeader>
-					{selectedInvoice && (
+
+					{isLoadingDetails && (
+						<div className="flex justify-center py-12">
+							<Loader2 className="size-8 animate-spin text-primary" />
+						</div>
+					)}
+
+					{!isLoadingDetails && selectedInvoice && (
 						<div className="space-y-6">
+							{/* Cliente y Vendedor */}
+							<div className="grid grid-cols-2 gap-4">
+								<div className="border border-border rounded-lg p-4">
+									<p className="text-xs font-black uppercase text-muted-foreground mb-2">
+										Cliente
+									</p>
+									{selectedInvoice.client ? (
+										<div className="space-y-1">
+											<p className="font-bold">
+												{selectedInvoice.client.firstName}{" "}
+												{selectedInvoice.client.lastName}
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{selectedInvoice.client.email}
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{selectedInvoice.client.phone}
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{selectedInvoice.client.address}
+											</p>
+										</div>
+									) : (
+										<p className="text-muted-foreground">Sin cliente</p>
+									)}
+								</div>
+								<div className="border border-border rounded-lg p-4">
+									<p className="text-xs font-black uppercase text-muted-foreground mb-2">
+										Vendedor
+									</p>
+									{selectedInvoice.seller ? (
+										<div className="space-y-1">
+											<p className="font-bold">
+												{selectedInvoice.seller.name}{" "}
+												{selectedInvoice.seller.lastName}
+											</p>
+											<p className="text-sm text-muted-foreground">
+												@{selectedInvoice.seller.username}
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{selectedInvoice.seller.email}
+											</p>
+										</div>
+									) : (
+										<p className="text-muted-foreground">Sin vendedor</p>
+									)}
+								</div>
+							</div>
+
 							{/* Header Info */}
 							<div className="grid grid-cols-2 gap-4 text-sm">
 								<div>

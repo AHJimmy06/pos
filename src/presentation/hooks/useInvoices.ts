@@ -11,6 +11,23 @@ export interface InvoiceDetail {
 	taxName: string;
 }
 
+export interface InvoiceClient {
+	id: number;
+	firstName: string | null;
+	lastName: string | null;
+	email: string | null;
+	phone: string | null;
+	address: string | null;
+}
+
+export interface InvoiceSeller {
+	id: number;
+	username: string;
+	name: string;
+	lastName: string;
+	email: string;
+}
+
 export interface Invoice {
 	id: number;
 	clientId: number;
@@ -23,6 +40,8 @@ export interface Invoice {
 	status: "DRAFT" | "CONFIRMED" | "CANCELLED";
 	paymentMethod: string;
 	details: InvoiceDetail[];
+	client: InvoiceClient | null;
+	seller: InvoiceSeller | null;
 }
 
 interface RawInvoiceDetail {
@@ -48,6 +67,21 @@ interface RawInvoice {
 	status: "DRAFT" | "CONFIRMED" | "CANCELLED";
 	paymentMethod: string;
 	details: RawInvoiceDetail[];
+	client?: {
+		id: number;
+		firstName: string | null;
+		lastName: string | null;
+		email: string | null;
+		phone: string | null;
+		address: string | null;
+	} | null;
+	seller?: {
+		id: number;
+		username: string;
+		name: string;
+		lastName: string;
+		email: string;
+	} | null;
 }
 
 function mapDetail(raw: RawInvoiceDetail): InvoiceDetail {
@@ -109,7 +143,9 @@ export const useInvoices = (
 			if (searchId) {
 				params.append("searchId", String(searchId));
 			}
-			const response = await apiClient.get<PaginatedResponse<RawInvoice>>(`/invoices?${params}`);
+			const response = await apiClient.get<PaginatedResponse<RawInvoice>>(
+				`/invoices?${params}`,
+			);
 			const raw = response.data;
 			if (!raw) return { data: [], total: 0 };
 			return {
