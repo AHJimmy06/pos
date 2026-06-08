@@ -3,9 +3,9 @@ import { useProducts, type SearchField } from "../hooks/useProducts";
 import { useTaxes } from "../hooks/usePOS";
 import { usePOSStore } from "../store/usePOSStore";
 import { useApplication } from "../context/use-application";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
 	DropdownSelector,
 	type DropdownOption,
@@ -35,12 +35,14 @@ const SEARCH_FIELD_LABELS: Record<string, string> = {
 	stock: "Stock",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
+
 export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	triggerClassName,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [page, setPage] = useState(1);
-	const [limit] = useState(10);
+	const [limit, setLimit] = useState<number>(10);
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [searchField, setSearchField] = useState<SearchField>("all");
@@ -60,13 +62,6 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	const taxesData = useTaxes();
 	const taxes =
 		(taxesData as any)?.taxes || (taxesData as any)?.data || taxesData || [];
-
-	const formatCurrency = (value: number) =>
-		new Intl.NumberFormat("es-CO", {
-			style: "currency",
-			currency: "COP",
-			minimumFractionDigits: 0,
-		}).format(value);
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -336,6 +331,24 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 
 						{totalPages > 1 && (
 							<div className="flex flex-wrap items-center justify-between p-4 border-t border-border bg-muted/10 gap-4">
+								<div className="flex items-center gap-2">
+									<span className="text-xs text-muted-foreground">Mostrar</span>
+									<select
+										value={limit}
+										onChange={(e) => {
+											setLimit(Number(e.target.value));
+											setPage(1);
+										}}
+										className="h-8 px-2 rounded border border-input bg-background text-xs font-bold w-16 text-center"
+									>
+										{PAGE_SIZE_OPTIONS.map((size) => (
+											<option key={size} value={size}>
+												{size}
+											</option>
+										))}
+									</select>
+									<span className="text-xs text-muted-foreground">por página</span>
+								</div>
 								<p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
 									Página {page} de {totalPages} ({total} items)
 								</p>

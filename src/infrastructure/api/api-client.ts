@@ -16,14 +16,15 @@ apiClient.interceptors.request.use(
 		}
 		return config;
 	},
-	(error) => Promise.reject(error)
+	(error) => Promise.reject(error),
 );
 
 // Función recursiva para normalizar objetos del dominio
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalize(obj: any): any {
 	if (Array.isArray(obj)) return obj.map(normalize);
-	if (obj === null || typeof obj !== "object" || obj instanceof Date) return obj;
+	if (obj === null || typeof obj !== "object" || obj instanceof Date)
+		return obj;
 
 	// Evitar procesar objetos que ya son limpios o de librerías
 	if ("config" in obj && "headers" in obj && "request" in obj) return obj;
@@ -78,36 +79,26 @@ apiClient.interceptors.response.use(
 		if (
 			data &&
 			typeof data === "object" &&
-			data.success === true &&
+			"success" in data &&
+			(data as { success?: unknown }).success === true &&
 			"data" in data
 		) {
-			// Extraer el payload y normalizarlo
-			const payload = data.data;
-			
-			// Si es paginado { data: [...], total: N }
-			if (
-				payload &&
-				typeof payload === "object" &&
-				"data" in payload &&
-				Array.isArray(payload.data)
-			) {
-				response.data = {
-					data: normalize(payload.data),
-					total: payload.total ?? 0,
-				};
-			} else {
-				// Si es un objeto simple
-				response.data = normalize(payload);
-			}
+			// Solo normalizar el payload interno, NO re-estructurar response.data
+			// así extractPayload en el repository puede hacer su trabajo correctamente
+			(data as { data: unknown }).data = normalize(
+				(data as { data: unknown }).data,
+			);
 		} else {
-			// Si no tiene wrapper, normalizar como está
+			// Si no tiene wrapper, normalizar como está (respuestas sin wrapper)
 			response.data = normalize(data);
 		}
 
 		return response;
 	},
 	(error: AxiosError) => {
-		const responseData = error.response?.data as Record<string, unknown> | undefined;
+		const responseData = error.response?.data as
+			| Record<string, unknown>
+			| undefined;
 		const statusCode = error.response?.status || 500;
 
 		let errorMessage = "Error de conexión";
@@ -120,7 +111,16 @@ apiClient.interceptors.response.use(
 			errorMessage = error.message;
 		}
 
-		// Contexto por código de error
+		// Mensajes específicos por código de aplicación (definidos por el backend en BusinessException)
+		const responseCode =
+			(responseData as { code?: unknown } | undefined)?.code ??
+			(responseData as { data?: { code?: unknown } } | undefined)?.data?.code;
+		if (statusCode === 400 && responseCode === "ACCOUNT_BLOCKED") {
+			errorMessage =
+				"Cuenta bloqueada por múltiples intentos fallidos. Contacte al administrador.";
+		}
+
+		// Contexto por código HTTP
 		if (statusCode === 401) {
 			errorMessage = "No autorizado. Por favor, inicia sesión de nuevo.";
 			localStorage.removeItem("pos_token");
@@ -142,5 +142,5 @@ apiClient.interceptors.response.use(
 		});
 
 		return Promise.reject(new Error(errorMessage));
-	}
+	},
 );

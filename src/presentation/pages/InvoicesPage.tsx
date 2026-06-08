@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { useInvoices, type Invoice } from "../hooks/useInvoices";
+import { useInvoices } from "../hooks/usePOS";
 import { apiClient } from "@/infrastructure/api/api-client";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "@/lib/format";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,13 +23,61 @@ import {
 	XCircle,
 } from "lucide-react";
 
+type InvoiceStatus = "DRAFT" | "CONFIRMED" | "CANCELLED";
+
+interface InvoiceDetailRow {
+	productId: number;
+	productName: string;
+	quantity: number;
+	unitPriceSnapshot: number;
+	subtotal: number;
+	taxRate: number;
+	taxName: string;
+}
+
+interface InvoiceClientRow {
+	id: number;
+	firstName: string | null;
+	lastName: string | null;
+	email: string | null;
+	phone: string | null;
+	address: string | null;
+}
+
+interface InvoiceSellerRow {
+	id: number;
+	username: string;
+	name: string;
+	lastName: string;
+	email: string;
+}
+
+interface InvoiceRow {
+	id: number;
+	issueDate: string;
+	subtotalSnapshot: number;
+	taxTotalSnapshot: number;
+	totalSnapshot: number;
+	status: InvoiceStatus;
+	paymentMethod: string;
+	transactionId?: string;
+	client?: InvoiceClientRow | null;
+	seller?: InvoiceSellerRow | null;
+	details: InvoiceDetailRow[];
+}
+
 export const InvoicesPage: React.FC = () => {
 	const [page, setPage] = useState(1);
 	const [searchIdInput, setSearchIdInput] = useState("");
 	const [searchId, setSearchId] = useState<number | undefined>(undefined);
 	const [currentPageInput, setCurrentPageInput] = useState("");
-	const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+	const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(
+		null,
+	);
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+	const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "ALL">(
+		"ALL",
+	);
 
 	const {
 		invoices,
@@ -39,10 +88,16 @@ export const InvoicesPage: React.FC = () => {
 		error,
 		cancelInvoice,
 		isCancelling,
-	} = useInvoices(page, 15, searchId);
+	} = useInvoices({ page, limit: 15, searchId });
 
 	const { user } = useAuth();
 	const isAdmin = user?.role === "ADMINISTRATOR";
+
+	// Filtrar facturas por estado
+	const filteredInvoices =
+		statusFilter === "ALL"
+			? invoices
+			: invoices.filter((inv) => inv.status === statusFilter);
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -68,22 +123,28 @@ export const InvoicesPage: React.FC = () => {
 
 	const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
-	const openDetails = async (invoice: Invoice) => {
+	const openDetails = async (invoice: { id: number }) => {
 		setIsDetailsOpen(true);
 		setIsLoadingDetails(true);
 
 		try {
-			const response = await apiClient.get<Invoice>(`/invoices/${invoice.id}`);
-			setSelectedInvoice(response.data);
+			const response = await apiClient.get<InvoiceRow>(
+				`/invoices/${invoice.id}`,
+			);
+			// interceptor preserves NestJS wrapper → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (inner && typeof inner === "object") {
+				setSelectedInvoice(inner as InvoiceRow);
+			}
 		} catch (err) {
 			console.error("Error cargando detalles:", err);
-			setSelectedInvoice(invoice);
 		} finally {
 			setIsLoadingDetails(false);
 		}
 	};
 
-	const handleCancel = async (invoice: Invoice) => {
+	const handleCancel = async (invoice: { id: number }) => {
 		if (confirm(`Cancelar factura #${invoice.id}?`)) {
 			try {
 				await cancelInvoice(invoice.id, "CANCELLED");
@@ -113,7 +174,7 @@ export const InvoicesPage: React.FC = () => {
 		return pageList;
 	};
 
-	const getStatusBadge = (status: Invoice["status"]) => {
+	const getStatusBadge = (status: InvoiceStatus) => {
 		switch (status) {
 			case "DRAFT":
 				return <Badge variant="secondary">Borrador</Badge>;
@@ -126,14 +187,8 @@ export const InvoicesPage: React.FC = () => {
 		}
 	};
 
-	const formatCurrency = (value: number) =>
-		new Intl.NumberFormat("es-CO", {
-			style: "currency",
-			currency: "COP",
-		}).format(value);
-
 	const formatDate = (dateStr: string) =>
-		new Date(dateStr).toLocaleDateString("es-CO", {
+		new Date(dateStr).toLocaleDateString("es-AR", {
 			year: "numeric",
 			month: "short",
 			day: "numeric",
@@ -182,32 +237,49 @@ export const InvoicesPage: React.FC = () => {
 						<CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
 							Listado de Facturas ({total})
 						</CardTitle>
-						<form onSubmit={handleSearch} className="flex gap-2">
-							<div className="relative">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-								<Input
-									placeholder="Buscar por ID de factura..."
-									value={searchIdInput}
-									onChange={(e) => setSearchIdInput(e.target.value)}
-									className="pl-10 w-64"
-									type="number"
-									min={1}
-								/>
-							</div>
-							<Button type="submit" variant="secondary" size="sm">
-								Buscar
-							</Button>
-							{searchId && (
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onClick={handleClearSearch}
-								>
-									Limpiar
+						<div className="flex gap-2 items-center">
+							{/* Filtro por estado */}
+							<select
+								value={statusFilter}
+								onChange={(e) => {
+									setStatusFilter(e.target.value as InvoiceStatus | "ALL");
+									setPage(1);
+								}}
+								className="h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground"
+							>
+								<option value="ALL">Todos los estados</option>
+								<option value="CONFIRMED">Confirmadas</option>
+								<option value="DRAFT">Borrador</option>
+								<option value="CANCELLED">Canceladas</option>
+							</select>
+
+							<form onSubmit={handleSearch} className="flex gap-2">
+								<div className="relative">
+									<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+									<Input
+										placeholder="Buscar por ID de factura..."
+										value={searchIdInput}
+										onChange={(e) => setSearchIdInput(e.target.value)}
+										className="pl-10 w-64"
+										type="number"
+										min={1}
+									/>
+								</div>
+								<Button type="submit" variant="secondary" size="sm">
+									Buscar
 								</Button>
-							)}
-						</form>
+								{searchId && (
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onClick={handleClearSearch}
+									>
+										Limpiar
+									</Button>
+								)}
+							</form>
+						</div>
 					</div>
 				</CardHeader>
 				<CardContent>
@@ -226,7 +298,7 @@ export const InvoicesPage: React.FC = () => {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border/50">
-								{invoices.map((invoice) => (
+								{filteredInvoices.map((invoice) => (
 									<tr
 										key={invoice.id}
 										className="bg-transparent hover:bg-muted/20"
@@ -253,7 +325,7 @@ export const InvoicesPage: React.FC = () => {
 											<div className="flex items-center justify-center gap-1">
 												<Button
 													variant="ghost"
-													size="icon-sm"
+													size="icon"
 													onClick={() => openDetails(invoice)}
 													title="Ver detalles"
 												>
@@ -262,7 +334,7 @@ export const InvoicesPage: React.FC = () => {
 												{isAdmin && invoice.status === "CONFIRMED" && (
 													<Button
 														variant="ghost"
-														size="icon-sm"
+														size="icon"
 														onClick={() => handleCancel(invoice)}
 														disabled={isCancelling}
 														className="text-destructive hover:text-destructive"
@@ -275,13 +347,15 @@ export const InvoicesPage: React.FC = () => {
 										</td>
 									</tr>
 								))}
-								{invoices.length === 0 && (
+								{filteredInvoices.length === 0 && (
 									<tr>
 										<td
 											colSpan={7}
 											className="px-6 py-10 text-center text-muted-foreground"
 										>
-											No hay facturas registradas
+											{statusFilter === "ALL"
+												? "No hay facturas registradas"
+												: "No hay facturas con el estado seleccionado"}
 										</td>
 									</tr>
 								)}

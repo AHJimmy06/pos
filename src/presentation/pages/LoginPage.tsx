@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth, type UserRole } from "../context/AuthContext";
+import { useAuth, type User } from "../context/AuthContext";
 import { apiClient } from "@/infrastructure/api/api-client";
 import {
 	Card,
@@ -49,11 +49,17 @@ function getPayload<T>(response: AxiosResponse): T | null {
 	return data as T;
 }
 
+interface MeResponse {
+	success: boolean;
+	data: Omit<User, "role" | "fullName">;
+}
+
 export const LoginPage: React.FC = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isLoadingUser, setIsLoadingUser] = useState(false);
 
 	const { login } = useAuth();
 	const navigate = useNavigate();
@@ -67,11 +73,11 @@ export const LoginPage: React.FC = () => {
 		setIsSubmitting(true);
 
 		try {
-			// Llamada al endpoint de la API
-			const response = await apiClient.post<LoginApiResponse>(
-				"/auth/login",
-				{ email, password },
-			);
+			// Paso 1: autenticación → token
+			const response = await apiClient.post<LoginApiResponse>("/auth/login", {
+				email,
+				password,
+			});
 
 			const payload = getPayload<LoginPayload>(response);
 			if (!payload?.accessToken) {
@@ -79,26 +85,19 @@ export const LoginPage: React.FC = () => {
 			}
 
 			const { accessToken } = payload;
-
-			// Guardar token en localStorage antes de crear usuario
 			localStorage.setItem("pos_token", accessToken);
 
-			// Crear usuario basado en el email
-			const mockUser = {
-				id: "1",
-				username: email.split("@")[0],
-				role: (email.includes("admin")
-					? "ADMINISTRATOR"
-					: "SELLER") as UserRole,
-				fullName: email.includes("admin")
-					? "Administrador Sistema"
-					: "Vendedor Usuario",
-			};
+			// Paso 2: cargar el usuario real desde el backend
+			// (no inferimos rol desde el email; el servidor es la fuente de verdad)
+			setIsLoadingUser(true);
+			const meResponse = await apiClient.get<MeResponse>("/auth/me");
+			const me = getPayload<Omit<User, "role" | "fullName">>(meResponse);
+			if (!me) {
+				throw new Error("No se pudo obtener la información del usuario");
+			}
 
-			// Llamar a login del context
-			login(accessToken, mockUser);
+			login(accessToken, me as User);
 
-			// Navegar después de guardar todo
 			navigate(from, { replace: true });
 		} catch (err: unknown) {
 			const errorMessage =
@@ -107,8 +106,11 @@ export const LoginPage: React.FC = () => {
 			setError(errorMessage);
 		} finally {
 			setIsSubmitting(false);
+			setIsLoadingUser(false);
 		}
 	};
+
+	const isBusy = isSubmitting || isLoadingUser;
 
 	return (
 		<div className="min-h-screen flex items-center justify-center bg-muted/20 px-4">
@@ -166,15 +168,19 @@ export const LoginPage: React.FC = () => {
 									required
 									className="bg-background/50"
 								/>
+								<p className="text-[10px] text-muted-foreground">
+									8-10 caracteres, al menos 1 mayúscula, 1 minúscula, 1 número y
+									1 carácter especial (@$!%*?&)
+								</p>
 							</div>
 						</CardContent>
 						<CardFooter>
 							<Button
 								type="submit"
 								className="w-full font-bold uppercase tracking-tight"
-								disabled={isSubmitting}
+								disabled={isBusy}
 							>
-								{isSubmitting ? (
+								{isBusy ? (
 									"Iniciando..."
 								) : (
 									<>

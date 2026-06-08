@@ -51,7 +51,13 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 				params.append("search", search);
 			}
 			const response = await apiClient.get<PaginatedResponse<Tax>>(`/taxes?${params}`);
-			return response.data ?? { data: [], total: 0 };
+				// interceptor preserves NestJS wrapper in response.data → extract inner payload
+				const wrapper = response.data as { data?: unknown };
+				const inner = wrapper?.data;
+				if (inner && typeof inner === "object" && "data" in inner) {
+					return inner as PaginatedResponse<Tax>;
+				}
+				return { data: [], total: 0 };
 		},
 	});
 
@@ -62,8 +68,11 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateTaxDto): Promise<Tax> => {
 			const response = await apiClient.post<Tax>("/taxes", data);
-			if (!response.data) throw new Error("Error al crear impuesto");
-			return response.data;
+			// interceptor preserves NestJS wrapper → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (!inner) throw new Error("Error al crear impuesto");
+			return inner as Tax;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["taxes"] });
@@ -79,8 +88,11 @@ export const useTaxes = (page = 1, limit = 15, search = ""): UseTaxesResult => {
 			data: UpdateTaxDto;
 		}): Promise<Tax> => {
 			const response = await apiClient.put<Tax>(`/taxes/${id}`, data);
-			if (!response.data) throw new Error("Error al actualizar impuesto");
-			return response.data;
+			// interceptor preserves NestJS wrapper → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (!inner) throw new Error("Error al actualizar impuesto");
+			return inner as Tax;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["taxes"] });

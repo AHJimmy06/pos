@@ -67,7 +67,13 @@ export const useProducts = (
 				params.append("searchField", searchField);
 			}
 			const response = await apiClient.get<PaginatedResponse<Product>>(`/products?${params}`);
-			return response.data ?? { data: [], total: 0 };
+				// interceptor preserves NestJS wrapper in response.data → extract inner payload
+				const wrapper = response.data as { data?: unknown };
+				const inner = wrapper?.data;
+				if (inner && typeof inner === "object" && "data" in inner) {
+					return inner as PaginatedResponse<Product>;
+				}
+				return { data: [], total: 0 };
 		},
 	});
 
@@ -78,8 +84,11 @@ export const useProducts = (
 	const createMutation = useMutation({
 		mutationFn: async (data: CreateProductDto): Promise<Product> => {
 			const response = await apiClient.post<Product>("/products", data);
-			if (!response.data) throw new Error("Error al crear producto");
-			return response.data;
+			// interceptor preserves NestJS wrapper → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (!inner) throw new Error("Error al crear producto");
+			return inner as Product;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -95,8 +104,11 @@ export const useProducts = (
 			data: UpdateProductDto;
 		}): Promise<Product> => {
 			const response = await apiClient.put<Product>(`/products/${id}`, data);
-			if (!response.data) throw new Error("Error al actualizar producto");
-			return response.data;
+			// interceptor preserves NestJS wrapper → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (!inner) throw new Error("Error al actualizar producto");
+			return inner as Product;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["products"] });

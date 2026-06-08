@@ -204,7 +204,7 @@ export const InvoiceHistory = () => {
 					) : (
 						<>
 							<div className="space-y-2 max-h-[200px] overflow-y-auto">
-								{invoices.map((inv: Invoice) => (
+								{invoices.map((inv) => (
 									<div
 										key={inv.id}
 										className="flex justify-between items-center p-3 bg-muted/30 hover:bg-muted/50 rounded-lg border border-border/50 cursor-pointer transition-colors"
@@ -225,18 +225,16 @@ export const InvoiceHistory = () => {
 											<div className="flex items-center gap-3 text-xs text-muted-foreground">
 												<span>
 													{inv.issueDate
-														? new Date(inv.issueDate).toLocaleDateString(
-																"es-AR",
-															)
+														? new Date(inv.issueDate).toLocaleDateString("es-AR")
 														: "Sin fecha"}
 												</span>
 												<span>•</span>
-												<span>{inv.details?.length || 0} items</span>
+												<span>{inv.totalSnapshot ? `$${inv.totalSnapshot.toFixed(2)}` : "$0.00"}</span>
 											</div>
 										</div>
 										<div className="flex items-center gap-2 ml-4">
 											<span className="font-black text-primary text-sm">
-												{inv.total?.toString() || "$0.00"}
+												{inv.totalSnapshot ? `$${inv.totalSnapshot.toFixed(2)}` : "$0.00"}
 											</span>
 											<Button
 												variant="ghost"
@@ -244,8 +242,7 @@ export const InvoiceHistory = () => {
 												onClick={(e) => {
 													e.stopPropagation();
 													if (inv.id) {
-														setSelectedInvoice(inv);
-														setIsModalOpen(true);
+														handleViewInvoice(inv.id);
 													}
 												}}
 												title="Ver / Imprimir"

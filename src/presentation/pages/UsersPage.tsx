@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/infrastructure/api/api-client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 	DialogFooter,
+	DialogDescription,
 } from "@/components/ui/dialog";
 import {
 	UserPlus,
@@ -23,6 +24,7 @@ import {
 	ChevronRight,
 	Users,
 	Search,
+	Pencil,
 } from "lucide-react";
 
 interface User {
@@ -46,6 +48,8 @@ export const UsersPage: React.FC = () => {
 	const [searchInput, setSearchInput] = useState("");
 	const [currentPageInput, setCurrentPageInput] = useState("");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [isEditMode, setIsEditMode] = useState(false);
+	const [editingUserId, setEditingUserId] = useState<number | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const [formData, setFormData] = useState({
@@ -57,7 +61,39 @@ export const UsersPage: React.FC = () => {
 		roles: ["SELLER"],
 	});
 
+	const [loadingUserId, setLoadingUserId] = useState<number | null>(null);
+
 	const queryClient = useQueryClient();
+
+	const handleUnlock = async (userId: number) => {
+		if (!confirm("¿Desbloquear este usuario?")) return;
+		setLoadingUserId(userId);
+		try {
+			await apiClient.post(`/users/${userId}/unlock`);
+			queryClient.invalidateQueries({ queryKey: ["users"] });
+		} catch (err) {
+			console.error("Error desbloqueando usuario:", err);
+			alert("No se pudo desbloquear el usuario");
+		} finally {
+			setLoadingUserId(null);
+		}
+	};
+
+	const handleToggleActive = async (user: User) => {
+		const action = user.isActive ? "desactivar" : "activar";
+		const label = action.charAt(0).toUpperCase() + action.slice(1);
+		if (!confirm(`¿${label} este usuario?`)) return;
+		setLoadingUserId(user.id);
+		try {
+			await apiClient.put(`/users/${user.id}`, { isActive: !user.isActive });
+			queryClient.invalidateQueries({ queryKey: ["users"] });
+		} catch (err) {
+			console.error(`Error al ${action} usuario:`, err);
+			alert(`No se pudo ${action} el usuario`);
+		} finally {
+			setLoadingUserId(null);
+		}
+	};
 
 	const { data, isLoading, error } = useQuery<UsersResponse>({
 		queryKey: ["users", { page, search }],
@@ -70,7 +106,13 @@ export const UsersPage: React.FC = () => {
 				params.append("search", search);
 			}
 			const res = await apiClient.get<UsersResponse>(`/users?${params}`);
-			return res.data ?? { data: [], total: 0 };
+			// interceptor preserves NestJS wrapper in res.data → unwrap it
+			const wrapper = res.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (inner && typeof inner === "object" && "data" in inner) {
+				return inner as UsersResponse;
+			}
+			return { data: [], total: 0 };
 		},
 	});
 
@@ -78,7 +120,23 @@ export const UsersPage: React.FC = () => {
 	const total: number = data?.total ?? 0;
 	const totalPages = Math.ceil(total / 15);
 
+	const openEditDialog = (user: User) => {
+		setFormData({
+			username: user.username,
+			name: user.name,
+			lastName: user.lastName,
+			email: user.email,
+			password: "", // No se edita pass por aquÃ­
+			roles: user.roles,
+		});
+		setEditingUserId(user.id);
+		setIsEditMode(true);
+		setIsDialogOpen(true);
+	};
+
 	const openCreateDialog = () => {
+		setIsEditMode(false);
+		setEditingUserId(null);
 		setFormData({
 			username: "",
 			name: "",
@@ -94,18 +152,27 @@ export const UsersPage: React.FC = () => {
 		e.preventDefault();
 		setIsSubmitting(true);
 		try {
-			await apiClient.post("/auth/register", {
-				username: formData.username,
-				name: formData.name,
-				lastName: formData.lastName,
-				email: formData.email,
-				password: formData.password,
-				roles: formData.roles,
-			});
+			if (isEditMode && editingUserId) {
+				await apiClient.put(`/users/${editingUserId}`, {
+					username: formData.username,
+					name: formData.name,
+					lastName: formData.lastName,
+					email: formData.email,
+				});
+			} else {
+				await apiClient.post("/auth/register", {
+					username: formData.username,
+					name: formData.name,
+					lastName: formData.lastName,
+					email: formData.email,
+					password: formData.password,
+					roles: formData.roles,
+				});
+			}
 			setIsDialogOpen(false);
 			queryClient.invalidateQueries({ queryKey: ["users"] });
 		} catch (err) {
-			console.error("Error al registrar:", err);
+			console.error("Error en la operaciÃ³n:", err);
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -177,7 +244,7 @@ export const UsersPage: React.FC = () => {
 							Usuarios
 						</h1>
 						<p className="text-muted-foreground">
-							Gestión de personal y permisos
+							GestiÃ³n de personal y permisos
 						</p>
 					</div>
 				</div>
@@ -282,7 +349,22 @@ export const UsersPage: React.FC = () => {
 										</td>
 										<td className="px-6 py-4 text-right">
 											<div className="flex items-center justify-center gap-1 float-right">
-												<Button variant="ghost" size="icon" className="size-8">
+												<Button
+													variant="ghost"
+													size="icon"
+													className="size-8 text-blue-600"
+													onClick={() => openEditDialog(u)}
+												>
+													<Pencil className="size-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="icon"
+													className="size-8"
+													onClick={() => handleUnlock(u.id)}
+													disabled={loadingUserId === u.id}
+													title="Desbloquear usuario"
+												>
 													<Lock className="size-4" />
 												</Button>
 												{u.isActive ? (
@@ -290,6 +372,9 @@ export const UsersPage: React.FC = () => {
 														variant="ghost"
 														size="icon"
 														className="size-8 text-destructive"
+														onClick={() => handleToggleActive(u)}
+														disabled={loadingUserId === u.id}
+														title="Desactivar usuario"
 													>
 														<UserX className="size-4" />
 													</Button>
@@ -298,6 +383,9 @@ export const UsersPage: React.FC = () => {
 														variant="ghost"
 														size="icon"
 														className="size-8 text-emerald-600"
+														onClick={() => handleToggleActive(u)}
+														disabled={loadingUserId === u.id}
+														title="Activar usuario"
 													>
 														<UserCheck className="size-4" />
 													</Button>
@@ -324,7 +412,7 @@ export const UsersPage: React.FC = () => {
 					{totalPages > 1 && (
 						<div className="flex flex-wrap items-center justify-between mt-4 pt-4 gap-4">
 							<p className="text-sm text-muted-foreground">
-								Página {page} de {totalPages} ({total} usuarios)
+								PÃ¡gina {page} de {totalPages} ({total} usuarios)
 							</p>
 							<div className="flex items-center gap-2">
 								{/* Anterior */}
@@ -396,11 +484,18 @@ export const UsersPage: React.FC = () => {
 				</CardContent>
 			</Card>
 
-			{/* Register User Dialog */}
+			{/* User Dialog */}
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Registrar Nuevo Usuario</DialogTitle>
+						<DialogTitle>
+							{isEditMode ? "Editar Usuario" : "Registrar Nuevo Usuario"}
+						</DialogTitle>
+						<DialogDescription>
+							{isEditMode
+								? "Modifica los datos del usuario. La contraseña no se puede cambiar desde aquí."
+								: "Complete los datos del nuevo usuario."}
+						</DialogDescription>
 					</DialogHeader>
 					<form onSubmit={handleSubmit} className="space-y-4">
 						<div className="space-y-2">
@@ -486,25 +581,38 @@ export const UsersPage: React.FC = () => {
 								onChange={(e) =>
 									setFormData({ ...formData, password: e.target.value })
 								}
-								required
-								placeholder="Minimo 8 caracteres"
-								minLength={8}
-							/>
-						</div>
-						<div className="space-y-2">
-							<label className="text-sm font-medium">Rol</label>
-							<select
-								value={formData.roles[0]}
-								onChange={(e) =>
-									setFormData({ ...formData, roles: [e.target.value] })
+								required={!isEditMode}
+								disabled={isEditMode}
+								placeholder={
+									isEditMode
+										? "No se puede editar desde aquí"
+										: "Mínimo 8 caracteres"
 								}
-								className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
-							>
-								<option value="SELLER">Vendedor</option>
-								<option value="ADMINISTRATOR">Administrador</option>
-								<option value="AUDITOR">Auditor</option>
-							</select>
+								minLength={isEditMode ? 0 : 8}
+							/>
+							{!isEditMode && (
+								<p className="text-[10px] text-muted-foreground">
+									8-10 caracteres, al menos 1 mayúscula, 1 minúscula, 1 número y
+									1 carácter especial (@$!%*?&)
+								</p>
+							)}
 						</div>
+						{!isEditMode && (
+							<div className="space-y-2">
+								<label className="text-sm font-medium">Rol</label>
+								<select
+									value={formData.roles[0]}
+									onChange={(e) =>
+										setFormData({ ...formData, roles: [e.target.value] })
+									}
+									className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+								>
+									<option value="SELLER">Vendedor</option>
+									<option value="ADMINISTRATOR">Administrador</option>
+									<option value="AUDITOR">Auditor</option>
+								</select>
+							</div>
+						)}
 						<DialogFooter>
 							<Button
 								type="button"
@@ -517,8 +625,10 @@ export const UsersPage: React.FC = () => {
 								{isSubmitting ? (
 									<>
 										<Loader2 className="size-4 mr-2 animate-spin" />
-										Registrando...
+										{isEditMode ? "Guardando..." : "Registrando..."}
 									</>
+								) : isEditMode ? (
+									"Guardar Cambios"
 								) : (
 									"Registrar"
 								)}

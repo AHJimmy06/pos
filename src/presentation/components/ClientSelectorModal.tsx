@@ -1,13 +1,24 @@
 import React, { useState, useMemo } from "react";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { apiClient } from "@/infrastructure/api/api-client";
 import { useClients, type Client, type SearchField } from "../hooks/useClients";
 import { usePOSStore } from "../store/usePOSStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
 	DropdownSelector,
 	type DropdownOption,
 } from "@/components/ui/dropdown-selector";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+	DialogDescription,
+} from "@/components/ui/dialog";
 import {
 	User,
 	Search,
@@ -16,6 +27,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Check,
+	Plus,
 } from "lucide-react";
 
 const cn = (...classes: (string | boolean | undefined)[]) =>
@@ -33,17 +45,39 @@ const SEARCH_FIELD_LABELS: Record<string, string> = {
 	phone: "Teléfono",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
+
+interface NewClientForm {
+	firstName: string;
+	lastName: string;
+	phone: string;
+	address: string;
+	email: string;
+}
+
+const EMPTY_FORM: NewClientForm = {
+	firstName: "",
+	lastName: "",
+	phone: "",
+	address: "",
+	email: "",
+};
+
 export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 	triggerClassName,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [page, setPage] = useState(1);
-	const [limit] = useState(10);
+	const [limit, setLimit] = useState<number>(10);
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [searchField, setSearchField] = useState<SearchField>("all");
 	const [currentPageInput, setCurrentPageInput] = useState("");
 
+	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const [createForm, setCreateForm] = useState<NewClientForm>(EMPTY_FORM);
+
+	const queryClient = useQueryClient();
 	const { selectedClient, setSelectedClient, clear } = usePOSStore();
 	const { clients, total, totalPages, isLoading } = useClients(
 		page,
@@ -51,6 +85,39 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		search,
 		searchField,
 	);
+
+	const createClientMutation = useMutation({
+		mutationFn: async (data: NewClientForm) => {
+			const res = await apiClient.post("/clients", data);
+			return res.data;
+		},
+		onSuccess: async (response) => {
+			// Unwrap nested data if present
+			const created =
+				(response && typeof response === "object" && "data" in response
+					? (response as { data: unknown }).data
+					: response) as
+					| (Client & { id: number })
+					| undefined;
+			setIsCreateOpen(false);
+			setCreateForm(EMPTY_FORM);
+			await queryClient.invalidateQueries({ queryKey: ["clients"] });
+			// Auto-select the newly created client
+			if (created && created.id) {
+				setSelectedClient(created as unknown as Parameters<typeof setSelectedClient>[0]);
+				setIsOpen(false);
+				setSearch("");
+				setPage(1);
+				setSearchInput("");
+			}
+		},
+		onError: (err) => {
+			console.error("Error creando cliente:", err);
+			alert(
+				"No se pudo crear el cliente. Verifica los datos e intenta nuevamente.",
+			);
+		},
+	});
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -198,6 +265,18 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 							</button>
 						</div>
 
+						{/* Inline new-client action */}
+						<div className="px-4 pt-4 pb-2 border-b border-border bg-muted/20 flex justify-end">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => setIsCreateOpen(true)}
+								className="h-9"
+							>
+								<Plus className="size-3 mr-1" /> Nuevo Cliente
+							</Button>
+						</div>
+
 						{/* Search with Combobox */}
 						<div className="p-4 border-b border-border bg-muted/20 space-y-4">
 							<form
@@ -329,6 +408,24 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 						{/* Pagination */}
 						{totalPages > 1 && (
 							<div className="flex flex-wrap items-center justify-between p-4 border-t border-border bg-muted/10 gap-4">
+								<div className="flex items-center gap-2">
+									<span className="text-xs text-muted-foreground">Mostrar</span>
+									<select
+										value={limit}
+										onChange={(e) => {
+											setLimit(Number(e.target.value));
+											setPage(1);
+										}}
+										className="h-8 px-2 rounded border border-input bg-background text-xs font-bold w-16 text-center"
+									>
+										{PAGE_SIZE_OPTIONS.map((size) => (
+											<option key={size} value={size}>
+												{size}
+											</option>
+										))}
+									</select>
+									<span className="text-xs text-muted-foreground">por página</span>
+								</div>
 								<p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
 									Página {page} de {totalPages} ({total} clientes)
 								</p>
@@ -404,6 +501,116 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 					</div>
 				</div>
 			)}
+
+			{/* Inline new-client dialog */}
+			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Registrar Nuevo Cliente</DialogTitle>
+						<DialogDescription>
+							Complete los datos. El cliente se creará y quedará seleccionado
+							automáticamente.
+						</DialogDescription>
+					</DialogHeader>
+					<form
+						className="space-y-3"
+						onSubmit={(e) => {
+							e.preventDefault();
+							createClientMutation.mutate(createForm);
+						}}
+					>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="space-y-1.5">
+								<Label htmlFor="new-client-firstName">Nombre</Label>
+								<Input
+									id="new-client-firstName"
+									value={createForm.firstName}
+									onChange={(e) =>
+										setCreateForm({ ...createForm, firstName: e.target.value })
+									}
+									required
+									minLength={2}
+									maxLength={100}
+									placeholder="Juan"
+								/>
+							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="new-client-lastName">Apellido</Label>
+								<Input
+									id="new-client-lastName"
+									value={createForm.lastName}
+									onChange={(e) =>
+										setCreateForm({ ...createForm, lastName: e.target.value })
+									}
+									required
+									minLength={2}
+									maxLength={100}
+									placeholder="Pérez"
+								/>
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="new-client-phone">Teléfono</Label>
+							<Input
+								id="new-client-phone"
+								value={createForm.phone}
+								onChange={(e) =>
+									setCreateForm({ ...createForm, phone: e.target.value })
+								}
+								required
+								maxLength={50}
+								placeholder="0991234567"
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="new-client-address">Dirección</Label>
+							<Input
+								id="new-client-address"
+								value={createForm.address}
+								onChange={(e) =>
+									setCreateForm({ ...createForm, address: e.target.value })
+								}
+								required
+								maxLength={255}
+								placeholder="Av. Siempre Viva 123"
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="new-client-email">Correo Electrónico</Label>
+							<Input
+								id="new-client-email"
+								type="email"
+								value={createForm.email}
+								onChange={(e) =>
+									setCreateForm({ ...createForm, email: e.target.value })
+								}
+								required
+								maxLength={255}
+								placeholder="cliente@example.com"
+							/>
+						</div>
+						<DialogFooter className="gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setIsCreateOpen(false)}
+								disabled={createClientMutation.isPending}
+							>
+								Cancelar
+							</Button>
+							<Button type="submit" disabled={createClientMutation.isPending}>
+								{createClientMutation.isPending ? (
+									<>
+										<Loader2 className="size-3 mr-2 animate-spin" /> Creando
+									</>
+								) : (
+									"Crear Cliente"
+								)}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</>
 	);
 };

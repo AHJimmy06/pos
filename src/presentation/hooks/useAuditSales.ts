@@ -73,7 +73,10 @@ export const useAuditSales = (): UseAuditSalesResult => {
 				const response = await apiClient.get<AuditInvoice>(
 					`/invoices/by-number/${encodeURIComponent(currentNumber)}`,
 				);
-				return response.data;
+				// interceptor preserves NestJS wrapper → extract inner payload
+				const wrapper = response.data as { data?: unknown };
+				const inner = wrapper?.data;
+				return (inner ?? null) as AuditInvoice | null;
 			} catch (error: any) {
 				if (error.response?.status === 404) {
 					return null;
@@ -109,9 +112,9 @@ export const useAuditSales = (): UseAuditSalesResult => {
 
 	const downloadPdf = async () => {
 		if (!currentNumber) return;
-		
+
 		try {
-			const blob = await downloadMutation.refetch().then(r => r.data as Blob);
+			const blob = await downloadMutation.refetch().then((r) => r.data as Blob);
 			if (blob) {
 				const url = window.URL.createObjectURL(blob);
 				const a = document.createElement("a");

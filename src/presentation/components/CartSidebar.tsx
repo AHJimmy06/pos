@@ -6,6 +6,7 @@ import { useInvoices } from "../hooks/usePOS";
 import { useProducts } from "../hooks/useProducts";
 import { useTaxes } from "../hooks/useTaxes";
 import { useApplication } from "../context/use-application";
+import { formatCurrency as formatCurrencyBase } from "@/lib/format";
 
 import {
 	ShoppingCart,
@@ -92,31 +93,19 @@ const formatMoney = (value: unknown): string => {
 
 		// Verificar si tiene 'value' público
 		if ("value" in obj && typeof obj.value === "number") {
-			return new Intl.NumberFormat("es-CO", {
-				style: "currency",
-				currency: "USD",
-				minimumFractionDigits: 0,
-			}).format(obj.value);
+			return formatCurrencyBase(obj.value);
 		}
 
 		// Si tiene '_value' (Money usa _value internamente)
 		if ("_value" in obj && typeof obj._value === "number") {
-			return new Intl.NumberFormat("es-CO", {
-				style: "currency",
-				currency: "USD",
-				minimumFractionDigits: 0,
-			}).format(obj._value as number);
+			return formatCurrencyBase(obj._value as number);
 		}
 
 		return "$0";
 	}
 
 	if (typeof value === "number") {
-		return new Intl.NumberFormat("es-CO", {
-			style: "currency",
-			currency: "USD",
-			minimumFractionDigits: 0,
-		}).format(value);
+		return formatCurrencyBase(value);
 	}
 
 	return "$0";
@@ -238,7 +227,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 			currentInvoice.id
 		);
 		
-		// USDiar propiedades
+		// Asignar propiedades
 		updatedInvoice.details = updatedDetails;
 		if (currentInvoice.transactionId) {
 			updatedInvoice.transactionId = currentInvoice.transactionId;

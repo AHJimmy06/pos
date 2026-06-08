@@ -5,12 +5,11 @@ import {
 	ShoppingCart,
 	Users,
 	Package,
-	Settings,
 	LogOut,
 	Percent,
 	ChevronRight,
 	FileText,
-	Search,
+	AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,10 +41,10 @@ const sidebarItems: SidebarItem[] = [
 		roles: ["ADMINISTRATOR", "SELLER"],
 	},
 	{
-		title: "Auditoría",
-		path: "/audit/sales",
-		icon: Search,
-		roles: ["ADMINISTRATOR", "AUDITOR"],
+		title: "Logs de Errores",
+		path: "/logs/errors",
+		icon: AlertTriangle,
+		roles: ["ADMINISTRATOR"],
 	},
 	{
 		title: "Productos",
@@ -63,12 +62,6 @@ const sidebarItems: SidebarItem[] = [
 		title: "Impuestos",
 		path: "/taxes",
 		icon: Percent,
-		roles: ["ADMINISTRATOR"],
-	},
-	{
-		title: "Configuración",
-		path: "/settings",
-		icon: Settings,
 		roles: ["ADMINISTRATOR"],
 	},
 ];
@@ -114,10 +107,10 @@ export const Sidebar: React.FC = () => {
 						</p>
 						<p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70">
 							{user?.role === "ADMINISTRATOR"
-							? "Admin"
-							: user?.role === "AUDITOR"
-							? "Auditor"
-							: "Vendedor"}
+								? "Admin"
+								: user?.role === "AUDITOR"
+									? "Auditor"
+									: "Vendedor"}
 						</p>
 					</div>
 				</div>

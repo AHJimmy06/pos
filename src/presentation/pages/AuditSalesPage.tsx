@@ -40,9 +40,9 @@ export const AuditSalesPage: React.FC = () => {
 	};
 
 	const formatCurrency = (value: number) =>
-		new Intl.NumberFormat("es-CO", {
+		new Intl.NumberFormat("es-AR", {
 			style: "currency",
-			currency: "COP",
+			currency: "ARS",
 		}).format(value);
 
 	const formatDate = (dateStr: string) =>
