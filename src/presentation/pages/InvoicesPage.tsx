@@ -13,7 +13,6 @@ import {
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "@/components/ui/dialog";
 import {
 	Loader2,
@@ -35,10 +34,13 @@ interface InvoiceDetailRow {
 	productId: number;
 	productName: string;
 	quantity: number;
-	unitPriceSnapshot: number;
-	subtotal: number;
-	taxRate: number;
-	taxName: string;
+	// Prisma mapea Decimal a string en JSON. Aceptamos ambos.
+	unitPriceSnapshot: number | string;
+	// El back no incluye estos campos; los declaramos opcionales para
+	// que TS no rompa si la API no los manda.
+	subtotal?: number;
+	taxRate?: number;
+	taxName?: string;
 }
 
 interface InvoiceClientRow {
@@ -162,16 +164,26 @@ export const InvoicesPage: React.FC = () => {
 		invoice.sellerNameSnapshot = row.seller
 			? `${row.seller.name} ${row.seller.lastName}`.trim()
 			: undefined;
-		invoice.details = row.details.map(
-			(d) =>
-				new InvoiceDetail(
-					d.productId,
-					d.productName,
-					d.quantity,
-					d.unitPriceSnapshot,
-					[{ taxId: 0, rate: d.taxRate }],
-				),
-		);
+		invoice.details = row.details.map((d) => {
+			// Prisma mapea Decimal a string en JSON ("559.44"), no number.
+			// Si pasamos el string directo a new Money(), la suma con
+			// Number.EPSILON produce "559.442.22e-16" (concat de strings)
+			// y el resultado es NaN. Lo parseamos explicitamente.
+			const unitPriceNum =
+				typeof d.unitPriceSnapshot === "string"
+					? parseFloat(d.unitPriceSnapshot)
+					: Number(d.unitPriceSnapshot) || 0;
+			const quantity = Number(d.quantity) || 0;
+			// taxRate no viene en la API; no lo usamos para evitar NaN.
+			// Si en el futuro el back lo manda, lo parseamos aca.
+			return new InvoiceDetail(
+				d.productId,
+				d.productName,
+				quantity,
+				unitPriceNum,
+				[],
+			);
+		});
 
 		const client = row.client
 			? new DomainClient(
@@ -191,9 +203,22 @@ export const InvoicesPage: React.FC = () => {
 		};
 	};
 
-	const handleReprint = () => {
-		if (!selectedInvoice) return;
-		setPrintData(buildPrintData(selectedInvoice));
+	// Reimpresion desde la lista: hace un GET del detalle de la factura
+	// (necesario porque la lista NO trae `details`/`client`/`seller`),
+	// arma el printData y abre el modal de impresion.
+	const handleReprint = async (invoiceId: number) => {
+		try {
+			const response = await apiClient.get<InvoiceRow>(
+				`/invoices/${invoiceId}`,
+			);
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (inner && typeof inner === "object") {
+				setPrintData(buildPrintData(inner as InvoiceRow));
+			}
+		} catch (err) {
+			console.error("Error cargando factura para reimprimir:", err);
+		}
 	};
 
 	const openDetails = async (invoice: { id: number }) => {
@@ -443,6 +468,14 @@ export const InvoicesPage: React.FC = () => {
 												>
 													<Eye className="size-4" />
 												</Button>
+												<Button
+													variant="ghost"
+													size="icon"
+													onClick={() => handleReprint(invoice.id)}
+													title="Reimprimir factura"
+												>
+													<Printer className="size-4" />
+												</Button>
 												{isAdmin && invoice.status === "CONFIRMED" && (
 													<Button
 														variant="ghost"
@@ -663,7 +696,7 @@ export const InvoicesPage: React.FC = () => {
 												</th>
 												<th className="px-6 py-3 text-right font-black text-xs whitespace-nowrap">
 													IVA{" "}
-													{selectedInvoice.details[0]?.taxRate > 0
+													{selectedInvoice.details[0]?.taxRate
 														? `(${selectedInvoice.details[0].taxRate}%)`
 														: ""}
 												</th>
@@ -674,10 +707,19 @@ export const InvoicesPage: React.FC = () => {
 										</thead>
 										<tbody className="divide-y divide-border/50">
 											{selectedInvoice.details?.map((detail, idx) => {
+												// La API no garantiza taxRate/subtotal; los snapshots
+												// a nivel de invoice (subtotalSnapshot, etc.) son los
+												// confiables. Acá mostramos los valores que tengamos,
+												// con fallback a 0 para evitar NaN en el calculo de IVA.
+												const taxRate = detail.taxRate ?? 0;
+												const subtotal = detail.subtotal ?? 0;
+												const unitPriceNum =
+													typeof detail.unitPriceSnapshot === "string"
+														? parseFloat(detail.unitPriceSnapshot)
+														: detail.unitPriceSnapshot;
 												const iva =
-													detail.taxRate > 0
-														? (detail.subtotal * detail.taxRate) /
-															(100 + detail.taxRate)
+													taxRate > 0
+														? (subtotal * taxRate) / (100 + taxRate)
 														: 0;
 												return (
 													<tr key={idx}>
@@ -688,15 +730,15 @@ export const InvoicesPage: React.FC = () => {
 															{detail.quantity}
 														</td>
 														<td className="px-6 py-4 text-right whitespace-nowrap font-mono text-xs">
-															{formatCurrency(detail.unitPriceSnapshot)}
+															{formatCurrency(unitPriceNum)}
 														</td>
 														<td className="px-6 py-4 text-right whitespace-nowrap text-muted-foreground">
-															{detail.taxRate > 0
-																? `${formatCurrency(iva)} (${detail.taxRate}%)`
+															{taxRate > 0
+																? `${formatCurrency(iva)} (${taxRate}%)`
 																: "-"}
 														</td>
 														<td className="px-6 py-4 text-right whitespace-nowrap font-medium font-mono text-xs">
-															{formatCurrency(detail.subtotal)}
+															{formatCurrency(subtotal)}
 														</td>
 													</tr>
 												);
@@ -729,24 +771,6 @@ export const InvoicesPage: React.FC = () => {
 							</div>
 						</div>
 					)}
-					<DialogFooter>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleReprint}
-							disabled={!selectedInvoice || isLoadingDetails}
-						>
-							<Printer className="size-4 mr-2" />
-							Imprimir
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setIsDetailsOpen(false)}
-						>
-							Cerrar
-						</Button>
-					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
