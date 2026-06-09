@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/infrastructure/api/api-client";
+import { useAuth } from "../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,7 @@ interface UsersResponse {
 }
 
 export const UsersPage: React.FC = () => {
+	const { user } = useAuth();
 	const [page, setPage] = useState(1);
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
@@ -137,7 +139,11 @@ export const UsersPage: React.FC = () => {
 	// Filtros aplicados en cliente sobre el resultado del fetch.
 	// search filtra por email (case-insensitive); los selects filtran por
 	// rol y estado. "ALL" significa sin filtro para ese eje.
+	// ADEMÁS: Filtramos para que el usuario logueado no se vea a sí mismo en la lista.
 	const filteredUsers = users.filter((u) => {
+		if (user && u.id === user.id) {
+			return false;
+		}
 		if (search && !u.email.toLowerCase().includes(search.toLowerCase())) {
 			return false;
 		}
