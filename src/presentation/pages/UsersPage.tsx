@@ -25,7 +25,6 @@ import {
     Users,
     Search,
     Pencil,
-    AlertCircle,
 } from "lucide-react";
 
 // TODO: Reemplaza esto con tu hook real de autenticación (ej. de un AuthContext)
@@ -36,8 +35,6 @@ const useAuth = () => {
     };
 };
 
-const cn = (...classes: (string | boolean | undefined)[]) =>
-    classes.filter(Boolean).join(" ");
 
 interface User {
     id: number;
