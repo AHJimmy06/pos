@@ -64,12 +64,14 @@ export const UsersPage: React.FC = () => {
 		username: "",
 		name: "",
 		lastName: "",
+		cedula: "",
 		email: "",
 		password: "",
 		roles: ["SELLER"],
 	});
 
 	const [loadingUserId, setLoadingUserId] = useState<number | null>(null);
+	const [operationError, setOperationError] = useState<string | null>(null);
 
 	const queryClient = useQueryClient();
 
@@ -79,9 +81,9 @@ export const UsersPage: React.FC = () => {
 		try {
 			await apiClient.post(`/users/${userId}/unlock`);
 			queryClient.invalidateQueries({ queryKey: ["users"] });
-		} catch (err) {
+		} catch (err: any) {
 			console.error("Error desbloqueando usuario:", err);
-			alert("No se pudo desbloquear el usuario");
+			alert(err.message || "No se pudo desbloquear el usuario");
 		} finally {
 			setLoadingUserId(null);
 		}
@@ -95,9 +97,9 @@ export const UsersPage: React.FC = () => {
 		try {
 			await apiClient.put(`/users/${user.id}`, { isActive: !user.isActive });
 			queryClient.invalidateQueries({ queryKey: ["users"] });
-		} catch (err) {
+		} catch (err: any) {
 			console.error(`Error al ${action} usuario:`, err);
-			alert(`No se pudo ${action} el usuario`);
+			alert(err.message || `No se pudo ${action} el usuario`);
 		} finally {
 			setLoadingUserId(null);
 		}
@@ -150,12 +152,14 @@ export const UsersPage: React.FC = () => {
 			name: user.name,
 			lastName: user.lastName,
 			email: user.email,
+			cedula: (user as any).cedula || "",
 			password: "", // No se edita pass por aquÃ­
 			roles: user.roles,
 		});
 		setEditingUserId(user.id);
 		setIsEditMode(true);
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const openCreateDialog = () => {
@@ -165,16 +169,19 @@ export const UsersPage: React.FC = () => {
 			username: "",
 			name: "",
 			lastName: "",
+			cedula: "",
 			email: "",
 			password: "",
 			roles: ["SELLER"],
 		});
 		setIsDialogOpen(true);
+		setOperationError(null);
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setIsSubmitting(true);
+		setOperationError(null);
 		try {
 			if (isEditMode && editingUserId) {
 				await apiClient.put(`/users/${editingUserId}`, {
@@ -184,19 +191,24 @@ export const UsersPage: React.FC = () => {
 					email: formData.email,
 				});
 			} else {
-				await apiClient.post("/auth/register", {
+				const payload: any = {
 					username: formData.username,
 					name: formData.name,
 					lastName: formData.lastName,
 					email: formData.email,
 					password: formData.password,
 					roles: formData.roles,
-				});
+				};
+				if (formData.cedula) {
+					payload.cedula = formData.cedula;
+				}
+				await apiClient.post("/auth/register", payload);
 			}
 			setIsDialogOpen(false);
 			queryClient.invalidateQueries({ queryKey: ["users"] });
-		} catch (err) {
+		} catch (err: any) {
 			console.error("Error en la operaciÃ³n:", err);
+			setOperationError(err.message || "Error desconocido");
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -553,24 +565,50 @@ export const UsersPage: React.FC = () => {
 								: "Complete los datos del nuevo usuario."}
 						</DialogDescription>
 					</DialogHeader>
+					{operationError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<ShieldAlert className="size-4 flex-shrink-0" />
+							{operationError}
+						</div>
+					)}
 					<form onSubmit={handleSubmit} className="space-y-4">
-						<div className="space-y-2">
-							<label className="text-sm font-medium">Usuario</label>
-							<Input
-								value={formData.username}
-								onChange={(e) =>
-									setFormData({
-										...formData,
-										username: e.target.value.slice(0, 20),
-									})
-								}
-								required
-								placeholder="juan.perez"
-								maxLength={20}
-							/>
-							<span className="text-xs text-muted-foreground">
-								{formData.username.length}/20
-							</span>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">Usuario</label>
+								<Input
+									value={formData.username}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											username: e.target.value.slice(0, 20),
+										})
+									}
+									required
+									placeholder="juan.perez"
+									maxLength={20}
+								/>
+								<span className="text-xs text-muted-foreground">
+									{formData.username.length}/20
+								</span>
+							</div>
+							<div className="space-y-2">
+								<label className="text-sm font-medium">Cédula (Opcional)</label>
+								<Input
+									value={formData.cedula}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											cedula: e.target.value.replace(/\D/g, "").slice(0, 10),
+										})
+									}
+									placeholder="1712345678"
+									maxLength={10}
+									disabled={isEditMode}
+								/>
+								<span className="text-xs text-muted-foreground">
+									{formData.cedula.length}/10
+								</span>
+							</div>
 						</div>
 						<div className="grid grid-cols-2 gap-4">
 							<div className="space-y-2">
