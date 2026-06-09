@@ -22,8 +22,7 @@ export interface CreateClientDto {
 	cedula: string;
 }
 
-export interface UpdateClientDto
-	extends Partial<Omit<CreateClientDto, "cedula">> {
+export interface UpdateClientDto extends Partial<CreateClientDto> {
 	isActive?: boolean;
 }
 
@@ -141,7 +140,9 @@ export const useClients = (
 			id: number;
 			data: UpdateClientDto;
 		}): Promise<Client> => {
-			const response = await apiClient.put(`/clients/${id}`, data);
+			// El backend prohíbe explícitamente enviar 'cedula' en el update (property cedula should not exist)
+			const { cedula: _, ...updateData } = data;
+			const response = await apiClient.put(`/clients/${id}`, updateData);
 			const payload = getPayload<Client>(response);
 			if (!payload) throw new Error("Error al actualizar cliente");
 			return payload;

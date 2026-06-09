@@ -57,10 +57,29 @@ function normalize(obj: unknown): unknown {
 // Extraer mensaje de error de forma legible
 function extractErrorMessage(errorObj: unknown): string {
 	if (!errorObj || typeof errorObj !== "object") return "Error desconocido";
-	const e = errorObj as { message?: unknown; error?: unknown };
+	const e = errorObj as {
+		message?: unknown;
+		error?: unknown;
+		data?: unknown;
+		response?: unknown;
+	};
+
+	// Si el error viene de NestJS ValidationPipe directamente o envuelto en Axios
+	const response = (e.response || e) as { message?: unknown; error?: unknown };
+	if (response && typeof response === "object") {
+		if (typeof response.message === "string") return response.message;
+		if (Array.isArray(response.message)) return response.message.join(", ");
+	}
+
+	// Si el error está envuelto en data (nuestro wrapper personalizado), intentar extraerlo de ahí
+	if (e.data && typeof e.data === "object") {
+		return extractErrorMessage(e.data);
+	}
+
 	if (typeof e.message === "string") return e.message;
 	if (Array.isArray(e.message)) return e.message.join(", ");
 	if (typeof e.error === "string") return e.error;
+
 	return "Error desconocido";
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/infrastructure/api/api-client";
+import { isValidEcuadorianCedula } from "@/lib/validators";
 import { useClients, type Client, type SearchField } from "../hooks/useClients";
 import { usePOSStore } from "../store/usePOSStore";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 	ChevronRight,
 	Check,
 	Plus,
+	AlertCircle,
 } from "lucide-react";
 
 const cn = (...classes: (string | boolean | undefined)[]) =>
@@ -50,6 +52,7 @@ const PAGE_SIZE_OPTIONS = [10, 15, 20, 30] as const;
 interface NewClientForm {
 	firstName: string;
 	lastName: string;
+	cedula: string;
 	phone: string;
 	address: string;
 	email: string;
@@ -58,6 +61,7 @@ interface NewClientForm {
 const EMPTY_FORM: NewClientForm = {
 	firstName: "",
 	lastName: "",
+	cedula: "",
 	phone: "",
 	address: "",
 	email: "",
@@ -114,9 +118,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		},
 		onError: (err) => {
 			console.error("Error creando cliente:", err);
-			alert(
-				"No se pudo crear el cliente. Verifica los datos e intenta nuevamente.",
-			);
+			alert(err.message || "No se pudo crear el cliente.");
 		},
 	});
 
@@ -521,6 +523,10 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 						className="space-y-3"
 						onSubmit={(e) => {
 							e.preventDefault();
+							if (!isValidEcuadorianCedula(createForm.cedula)) {
+								alert("Por favor, ingresa una cédula ecuatoriana válida.");
+								return;
+							}
 							createClientMutation.mutate(createForm);
 						}}
 					>
@@ -553,6 +559,43 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 									placeholder="Pérez"
 								/>
 							</div>
+						</div>
+						<div className="space-y-1.5">
+							<Label
+								htmlFor="new-client-cedula"
+								className={cn(
+									createForm.cedula &&
+										!isValidEcuadorianCedula(createForm.cedula) &&
+										"text-destructive",
+								)}
+							>
+								Cédula / RUC
+							</Label>
+							<div className="relative">
+								<Input
+									id="new-client-cedula"
+									value={createForm.cedula}
+									onChange={(e) =>
+										setCreateForm({ ...createForm, cedula: e.target.value })
+									}
+									required
+									placeholder="Ej: 1712345678"
+									className={cn(
+										createForm.cedula &&
+											!isValidEcuadorianCedula(createForm.cedula) &&
+											"border-destructive focus-visible:ring-destructive",
+									)}
+								/>
+								{createForm.cedula &&
+									!isValidEcuadorianCedula(createForm.cedula) && (
+										<AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-destructive" />
+									)}
+							</div>
+							{createForm.cedula && !isValidEcuadorianCedula(createForm.cedula) && (
+								<p className="text-[10px] font-medium text-destructive">
+									Cédula ecuatoriana inválida
+								</p>
+							)}
 						</div>
 						<div className="space-y-1.5">
 							<Label htmlFor="new-client-phone">Teléfono</Label>

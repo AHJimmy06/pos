@@ -84,10 +84,9 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 	};
 
 	const handleAddProduct = (product: Product) => {
-		// `product` viene de useProducts() (interface con price/stock como
-		// value objects). El check de stock usa el getter hasStock para no
-		// comparar StockQuantity con number directamente.
-		if (!product.hasStock || !selectedClient) return;
+		// El stock ya viene normalizado como number por el interceptor de la API
+		// (desempaqueta Value Objects { value: ... }).
+		if (product.stock <= 0 || !selectedClient) return;
 
 		const currentInvoice = usePOSStore.getState().currentInvoice;
 		if (!currentInvoice) return;

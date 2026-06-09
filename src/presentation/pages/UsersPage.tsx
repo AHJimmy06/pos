@@ -299,7 +299,8 @@ export const UsersPage: React.FC = () => {
 				<CardHeader className="pb-4">
 					<div className="flex items-center justify-between">
 						<CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-							Personal del Sistema ({filteredUsers.length}{filteredUsers.length !== total ? ` de ${total}` : ""})
+							Personal del Sistema ({filteredUsers.length}
+							{filteredUsers.length !== total ? ` de ${total}` : ""})
 						</CardTitle>
 						<form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
 							{/* Filtro por correo */}
