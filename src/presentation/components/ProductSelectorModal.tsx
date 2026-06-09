@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from "react";
-import { useProducts, type SearchField } from "../hooks/useProducts";
+import {
+	useProducts,
+	type SearchField,
+	type Product,
+} from "../hooks/useProducts";
 import { useTaxes } from "../hooks/usePOS";
+import type { Tax } from "../hooks/useTaxes";
 import { usePOSStore } from "../store/usePOSStore";
 import { useApplication } from "../context/use-application";
 import { formatCurrency } from "@/lib/format";
@@ -60,8 +65,8 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 
 	// Get taxes for adding to products
 	const taxesData = useTaxes();
-	const taxes =
-		(taxesData as any)?.taxes || (taxesData as any)?.data || taxesData || [];
+	// useTaxes() (de usePOS.ts) devuelve { data: Tax[]; isLoading; isError }.
+	const taxes: Tax[] = taxesData.data;
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -78,9 +83,11 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 		setCurrentPageInput("");
 	};
 
-	const handleAddProduct = (product: any) => {
-		const stockValue = product.stock || 0;
-		if (stockValue <= 0 || !selectedClient) return;
+	const handleAddProduct = (product: Product) => {
+		// `product` viene de useProducts() (interface con price/stock como
+		// value objects). El check de stock usa el getter hasStock para no
+		// comparar StockQuantity con number directamente.
+		if (!product.hasStock || !selectedClient) return;
 
 		const currentInvoice = usePOSStore.getState().currentInvoice;
 		if (!currentInvoice) return;
@@ -347,7 +354,9 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
 											</option>
 										))}
 									</select>
-									<span className="text-xs text-muted-foreground">por página</span>
+									<span className="text-xs text-muted-foreground">
+										por página
+									</span>
 								</div>
 								<p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
 									Página {page} de {totalPages} ({total} items)

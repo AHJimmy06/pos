@@ -163,3 +163,33 @@ body {
     @apply font-sans;
   }
 }
+
+/* ── Accessibility: visible focus ring + skip-to-content link ────────── */
+
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom-right-radius: 6px;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Strip the default outline ONLY where the visible focus ring above
+   is sufficient (most buttons / links / inputs). We intentionally
+   do NOT use :focus { outline: none } globally — keeping the
+   accessibility default for any element we forgot to style. */

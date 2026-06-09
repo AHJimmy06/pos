@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useInvoices } from "../hooks/usePOS";
 import { apiClient } from "@/infrastructure/api/api-client";
 import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,14 +91,21 @@ export const InvoicesPage: React.FC = () => {
 		isCancelling,
 	} = useInvoices({ page, limit: 15, searchId });
 
-	const { user } = useAuth();
-	const isAdmin = user?.role === "ADMINISTRATOR";
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	// Filtrar facturas por estado
+	// Filtrar facturas por estado (declarado antes del useEffect de atajos para
+	// que el handler pueda referenciarlo sin chocar con la regla de hoisting).
 	const filteredInvoices =
 		statusFilter === "ALL"
 			? invoices
 			: invoices.filter((inv) => inv.status === statusFilter);
+
+	// NOTE: El useEffect de atajos se declara ABAJO del handler `openDetails`
+	// para evitar el warning de react-hooks/immutability que se dispara cuando
+	// un callback referencia una variable declarada después.
+
+	const { user } = useAuth();
+	const isAdmin = user?.role === "ADMINISTRATOR";
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -143,6 +151,39 @@ export const InvoicesPage: React.FC = () => {
 			setIsLoadingDetails(false);
 		}
 	};
+
+	// Keyboard shortcuts: j/k move row selection; Enter = open details.
+	// Single keys ignored when focus is on a text-editing element.
+	useEffect(() => {
+		const isEditing = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return (
+				tag === "INPUT" ||
+				tag === "TEXTAREA" ||
+				tag === "SELECT" ||
+				el.isContentEditable
+			);
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			if (isEditing(e.target)) return;
+			if (filteredInvoices.length === 0) return;
+			if (e.key === "j") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.min(filteredInvoices.length - 1, i + 1));
+			} else if (e.key === "k") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.max(0, i - 1));
+			} else if (e.key === "Enter") {
+				e.preventDefault();
+				const item = filteredInvoices[selectedIndex];
+				if (item) openDetails(item);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [filteredInvoices, selectedIndex]);
 
 	const handleCancel = async (invoice: { id: number }) => {
 		if (confirm(`Cancelar factura #${invoice.id}?`)) {
@@ -298,10 +339,16 @@ export const InvoicesPage: React.FC = () => {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border/50">
-								{filteredInvoices.map((invoice) => (
+								{filteredInvoices.map((invoice, idx) => (
 									<tr
 										key={invoice.id}
-										className="bg-transparent hover:bg-muted/20"
+										aria-selected={idx === selectedIndex}
+										className={cn(
+											"transition-colors cursor-default",
+											idx === selectedIndex
+												? "bg-accent/60"
+												: "bg-transparent hover:bg-muted/20",
+										)}
 									>
 										<td className="px-6 py-4 font-medium text-muted-foreground">
 											#{invoice.id}

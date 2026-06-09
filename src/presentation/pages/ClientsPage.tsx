@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	useClients,
 	type Client,
 	type CreateClientDto,
 	type SearchField,
 } from "../hooks/useClients";
+import { isValidEcuadorianCedula } from "@/lib/validators";
 import { useAuth } from "../context/AuthContext";
+import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,12 +95,20 @@ export const ClientsPage: React.FC = () => {
 	const { user } = useAuth();
 	const isAdmin = user?.role === "ADMINISTRATOR";
 
+	const [selectedIndex, setSelectedIndex] = useState(0);
+
+	// NOTE: El useEffect de atajos se declara ABAJO de los handlers
+	// (openCreateDialog, openEditDialog) para evitar el warning de
+	// react-hooks/immutability que se dispara cuando un callback referencia
+	// variables declaradas después.
+
 	const [formData, setFormData] = useState<CreateClientDto>({
 		firstName: "",
 		lastName: "",
 		email: "",
 		phone: "",
 		address: "",
+		cedula: "",
 	});
 
 	const handleSearch = (e: React.FormEvent) => {
@@ -135,6 +145,7 @@ export const ClientsPage: React.FC = () => {
 			email: "",
 			phone: "",
 			address: "",
+			cedula: "",
 		});
 		setIsDialogOpen(true);
 		setOperationError(null);
@@ -148,6 +159,7 @@ export const ClientsPage: React.FC = () => {
 			email: client.email,
 			phone: client.phone || "",
 			address: client.address || "",
+			cedula: client.cedula || "",
 		});
 		setIsDialogOpen(true);
 		setOperationError(null);
@@ -159,9 +171,68 @@ export const ClientsPage: React.FC = () => {
 		setOperationError(null);
 	};
 
+	// Keyboard shortcuts: j/k move row selection; n = new (admin only);
+	// e = edit. Single keys ignored when focus is on a text-editing element.
+	useEffect(() => {
+		const isEditing = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return (
+				tag === "INPUT" ||
+				tag === "TEXTAREA" ||
+				tag === "SELECT" ||
+				el.isContentEditable
+			);
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			if (isEditing(e.target)) return;
+			if (clients.length === 0) return;
+			if (e.key === "j") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.min(clients.length - 1, i + 1));
+			} else if (e.key === "k") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.max(0, i - 1));
+			} else if (e.key === "n") {
+				if (!isAdmin) return;
+				e.preventDefault();
+				openCreateDialog();
+			} else if (e.key === "e") {
+				if (!isAdmin) return;
+				e.preventDefault();
+				const item = clients[selectedIndex];
+				if (item) openEditDialog(item);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [clients, selectedIndex, isAdmin]);
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setOperationError(null);
+
+		// Cedula es requerida y debe ser ecuatoriana válida.
+		// En edición no se valida porque el campo está disabled (write-once).
+		if (!editingClient) {
+			const cedula = (formData.cedula || "").trim();
+			if (!cedula) {
+				setOperationError("La cédula es obligatoria");
+				return;
+			}
+			if (!/^\d{10}$/.test(cedula)) {
+				setOperationError("La cédula debe tener exactamente 10 dígitos");
+				return;
+			}
+			if (!isValidEcuadorianCedula(cedula)) {
+				setOperationError(
+					"La cédula no es ecuatoriana válida (dígito verificador incorrecto)",
+				);
+				return;
+			}
+		}
+
 		try {
 			if (editingClient) {
 				await updateClient(editingClient.id, formData);
@@ -310,7 +381,7 @@ export const ClientsPage: React.FC = () => {
 						<table className="w-full text-sm text-left">
 							<thead className="text-xs text-muted-foreground uppercase bg-muted/30">
 								<tr>
-									<th className="px-6 py-4 font-black">ID</th>
+									<th className="px-6 py-4 font-black">Cédula</th>
 									<th className="px-6 py-4 font-black">Nombre</th>
 									<th className="px-6 py-4 font-black">Email</th>
 									<th className="px-6 py-4 font-black">Telefono</th>
@@ -320,13 +391,19 @@ export const ClientsPage: React.FC = () => {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border/50">
-								{clients.map((client) => (
+								{clients.map((client, idx) => (
 									<tr
 										key={client.id}
-										className="bg-transparent hover:bg-muted/20 transition-colors"
+										aria-selected={idx === selectedIndex}
+										className={cn(
+											"transition-colors cursor-default",
+											idx === selectedIndex
+												? "bg-accent/60"
+												: "bg-transparent hover:bg-muted/20",
+										)}
 									>
-										<td className="px-6 py-4 font-medium text-muted-foreground">
-											#{client.id}
+										<td className="px-6 py-4 font-mono font-bold text-foreground">
+											{client.cedula || "—"}
 										</td>
 										<td className="px-6 py-4 font-bold text-foreground">
 											{client.firstName} {client.lastName}
@@ -532,6 +609,54 @@ export const ClientsPage: React.FC = () => {
 							<span className="text-xs text-muted-foreground">
 								{formData.lastName.length}/15
 							</span>
+						</div>
+						<div className="space-y-2">
+							<label className="text-sm font-medium">
+								Cédula <span className="text-destructive">*</span>
+							</label>
+							<Input
+								value={formData.cedula}
+								onChange={(e) => {
+									const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+									setFormData({ ...formData, cedula: digits });
+								}}
+								required
+								placeholder="1712345678"
+								maxLength={10}
+								inputMode="numeric"
+								pattern="\d{10}"
+								disabled={!!editingClient}
+								aria-invalid={
+									!editingClient &&
+									formData.cedula.length > 0 &&
+									!isValidEcuadorianCedula(formData.cedula)
+								}
+								className="font-mono"
+							/>
+							<div className="flex justify-between text-xs">
+								<span
+									className={
+										!editingClient &&
+										formData.cedula.length > 0 &&
+										!isValidEcuadorianCedula(formData.cedula)
+											? "text-destructive font-bold"
+											: "text-muted-foreground"
+									}
+								>
+									{!editingClient &&
+									formData.cedula.length > 0 &&
+									!isValidEcuadorianCedula(formData.cedula)
+										? formData.cedula.length < 10
+											? `Faltan ${10 - formData.cedula.length} dígitos`
+											: "Cédula no válida (verifica el dígito verificador)"
+										: editingClient
+											? "La cédula no se puede modificar"
+											: "Cédula ecuatoriana de 10 dígitos"}
+								</span>
+								<span className="text-muted-foreground">
+									{formData.cedula.length}/10
+								</span>
+							</div>
 						</div>
 						<div className="space-y-2">
 							<label className="text-sm font-medium">Email</label>

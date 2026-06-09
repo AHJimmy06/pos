@@ -3,19 +3,29 @@ import { Money } from "@/domain/value-objects/money.vo";
 import { StockQuantity } from "@/domain/value-objects/stock-quantity.vo";
 
 /**
+ * Shape del producto que llega de la API (serializado a JSON).
+ * El mapper lo convierte a la entidad de dominio `Product`.
+ */
+interface ApiProductShape {
+	id: number;
+	name: string;
+	price: number | Money;
+	stock: number | StockQuantity;
+}
+
+/**
  * Transforma datos planos de la API a entidades del dominio
  */
-export function mapApiProductToEntity(data: any): Product {
+export function mapApiProductToEntity(data: unknown): Product {
+	const p = data as ApiProductShape;
 	return new Product(
-		data.id,
-		data.name,
-		data.price instanceof Money ? data.price : new Money(data.price),
-		data.stock instanceof StockQuantity
-			? data.stock
-			: new StockQuantity(data.stock),
+		p.id,
+		p.name,
+		p.price instanceof Money ? p.price : new Money(p.price),
+		p.stock instanceof StockQuantity ? p.stock : new StockQuantity(p.stock),
 	);
 }
 
-export function mapApiProductsToEntities(data: any[]): Product[] {
-	return data.map(mapApiProductToEntity);
+export function mapApiProductsToEntities(data: unknown[]): Product[] {
+	return data.map((item) => mapApiProductToEntity(item));
 }

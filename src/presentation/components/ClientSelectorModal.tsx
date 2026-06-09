@@ -93,18 +93,19 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		},
 		onSuccess: async (response) => {
 			// Unwrap nested data if present
-			const created =
-				(response && typeof response === "object" && "data" in response
+			const created = (
+				response && typeof response === "object" && "data" in response
 					? (response as { data: unknown }).data
-					: response) as
-					| (Client & { id: number })
-					| undefined;
+					: response
+			) as (Client & { id: number }) | undefined;
 			setIsCreateOpen(false);
 			setCreateForm(EMPTY_FORM);
 			await queryClient.invalidateQueries({ queryKey: ["clients"] });
 			// Auto-select the newly created client
 			if (created && created.id) {
-				setSelectedClient(created as unknown as Parameters<typeof setSelectedClient>[0]);
+				setSelectedClient(
+					created as unknown as Parameters<typeof setSelectedClient>[0],
+				);
 				setIsOpen(false);
 				setSearch("");
 				setPage(1);
@@ -135,7 +136,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 	};
 
 	const handleSelectClient = (client: Client) => {
-		setSelectedClient(client as any);
+		setSelectedClient(client);
 		setIsOpen(false);
 		setSearch("");
 		setPage(1);
@@ -363,7 +364,9 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 														</td>
 														<td className="px-6 py-4 text-center">
 															<Badge
-																variant={client.isActive ? "secondary" : "outline"}
+																variant={
+																	client.isActive ? "secondary" : "outline"
+																}
 																className="text-[10px] font-black uppercase tracking-tight"
 															>
 																{client.isActive ? "Activo" : "Inactivo"}
@@ -424,7 +427,9 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 											</option>
 										))}
 									</select>
-									<span className="text-xs text-muted-foreground">por página</span>
+									<span className="text-xs text-muted-foreground">
+										por página
+									</span>
 								</div>
 								<p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
 									Página {page} de {totalPages} ({total} clientes)
@@ -614,4 +619,3 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		</>
 	);
 };
-

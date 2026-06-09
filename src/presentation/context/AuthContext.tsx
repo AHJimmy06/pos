@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { apiClient } from "@/infrastructure/api/api-client";
 
-export type UserRole = "ADMINISTRATOR" | "SELLER" | "AUDITOR";
+export type UserRole = "ADMINISTRATOR" | "SELLER";
 
 export interface User {
 	id: number;

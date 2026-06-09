@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
-import { InvoiceDetail ,Invoice } from '@/domain/entities/invoice.entity';
+import { InvoiceDetail, Invoice } from "@/domain/entities/invoice.entity";
+import { Client as DomainClient } from "@/domain/entities/client.entity";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePOSStore } from "../store/usePOSStore";
 import { useInvoices } from "../hooks/usePOS";
 import { useProducts } from "../hooks/useProducts";
-import { useTaxes } from "../hooks/useTaxes";
+import { useTaxes, type Tax } from "../hooks/useTaxes";
 import { useApplication } from "../context/use-application";
 import { formatCurrency as formatCurrencyBase } from "@/lib/format";
 
@@ -32,11 +33,141 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface CartSidebarProps {
 	onSuccess?: () => void;
 	onError?: (message: string) => void;
 }
+
+// Celda de cantidad editable: permite tipear el valor manualmente
+// además de usar los botones +/-. El commit se hace en blur o Enter
+// para no ejecutar la lógica de stock en cada keystroke.
+// onBeforeInput bloquea cualquier tecla/paste que dejaría el valor
+// por encima del stock, así el input es físicamente inválido.
+const QuantityCell: React.FC<{
+	item: InvoiceDetail;
+	stockValue: number;
+	onChange: (delta: number) => void;
+}> = ({ item, stockValue, onChange }) => {
+	const [value, setValue] = useState(String(item.quantity));
+	const [lastSeenQuantity, setLastSeenQuantity] = useState(item.quantity);
+
+	// Sincroniza el input cuando item.quantity cambia desde fuera
+	// (p.ej. click en +/-, o commit exitoso de otra fila). Se hace
+	// durante render (no en useEffect) para evitar cascading renders.
+	if (lastSeenQuantity !== item.quantity) {
+		setLastSeenQuantity(item.quantity);
+		setValue(String(item.quantity));
+	}
+
+	// ¿El valor tipeado está en el tope del stock disponible?
+	// Se usa para darle estilo de "alerta" al indicador de abajo.
+	const parsedForIndicator = parseInt(value, 10);
+	const atMax =
+		value !== "" &&
+		!Number.isNaN(parsedForIndicator) &&
+		parsedForIndicator === stockValue;
+
+	const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+		const ne = e.nativeEvent as InputEvent;
+		const target = e.currentTarget;
+		const current = target.value;
+		const selStart = target.selectionStart ?? current.length;
+		const selEnd = target.selectionEnd ?? current.length;
+		const inserted = ne.data ?? "";
+		const next = current.slice(0, selStart) + inserted + current.slice(selEnd);
+		const cleaned = next.replace(/[^0-9]/g, "");
+
+		// Permitimos borrar hasta vacío (el commit revierte al valor real)
+		if (cleaned === "") return;
+
+		const parsed = parseInt(cleaned, 10);
+		if (parsed > stockValue) {
+			e.preventDefault();
+		}
+	};
+
+	const commit = () => {
+		const parsed = parseInt(value, 10);
+
+		if (Number.isNaN(parsed) || parsed < 1) {
+			// Valor vacío, 0 o negativo → revertimos al valor real del invoice
+			setValue(String(item.quantity));
+			return;
+		}
+
+		if (parsed === item.quantity) return; // sin cambios
+
+		// Red de seguridad: si el stock cayó desde otra pestaña, clampeamos
+		// silenciosamente. onBeforeInput ya bloquea tipear valores inválidos
+		// en el caso normal.
+		const safeParsed = Math.min(parsed, stockValue);
+		onChange(safeParsed - item.quantity);
+	};
+
+	return (
+		<div className="flex flex-col items-center gap-0.5">
+			<div className="flex items-center justify-center border rounded-lg overflow-hidden h-7 scale-90 bg-background">
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					onClick={() => onChange(-1)}
+					aria-label={`Disminuir cantidad de ${item.productName}`}
+				>
+					<Minus className="size-3" />
+				</Button>
+				<Input
+					type="number"
+					min={1}
+					max={stockValue}
+					value={value}
+					onBeforeInput={handleBeforeInput}
+					onChange={(e) => setValue(e.target.value)}
+					onBlur={commit}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							e.currentTarget.blur();
+						} else if (e.key === "Escape") {
+							setValue(String(item.quantity));
+							e.currentTarget.blur();
+						}
+					}}
+					aria-label={`Cantidad de ${item.productName}`}
+					className="h-7 w-12 min-w-0 px-1 py-0 text-xs font-black text-center rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:border-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+				/>
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					disabled={item.quantity >= stockValue}
+					onClick={() => onChange(1)}
+					aria-label={`Aumentar cantidad de ${item.productName}`}
+				>
+					<Plus className="size-3" />
+				</Button>
+			</div>
+
+			{/* Indicador visual: stock máximo y valor que se está enviando.
+			    Cambia a estilo de alerta cuando el valor iguala el stock. */}
+			<div
+				role="status"
+				aria-live="polite"
+				className={cn(
+					"text-[9px] font-bold leading-none flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors",
+					atMax
+						? "bg-destructive/10 text-destructive ring-1 ring-destructive/30"
+						: "bg-muted/60 text-muted-foreground",
+				)}
+			>
+				<span className="uppercase tracking-tighter">Stock</span>
+				<span className="font-mono">
+					{value || "—"}/{stockValue}
+				</span>
+			</div>
+		</div>
+	);
+};
 
 // PDF Modal que aparece automáticamente tras una venta exitosa
 const InvoicePrintModal: React.FC<{
@@ -74,7 +205,7 @@ const InvoicePrintModal: React.FC<{
 					<InvoicePDF
 						ref={componentRef}
 						invoice={invoice!}
-						client={selectedClient!}
+						client={selectedClient as unknown as DomainClient}
 						invoiceNumber={invoiceNumber}
 					/>
 				</div>
@@ -119,7 +250,8 @@ const extractNumber = (value: unknown): number => {
 	if (typeof value === "object") {
 		const obj = value as Record<string, unknown>;
 		if ("value" in obj && typeof obj.value === "number") return obj.value;
-		if ("_value" in obj && typeof obj._value === "number") return obj._value as number;
+		if ("_value" in obj && typeof obj._value === "number")
+			return obj._value as number;
 	}
 
 	return 0;
@@ -195,38 +327,42 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 		if (!currentInvoice) return;
 
 		// Obtener el objeto de impuesto completo
-		const selectedTax = taxes.find((t: any) => t.id === newTaxId);
+		const selectedTax = taxes.find((t: Tax) => t.id === newTaxId);
 		if (!selectedTax) return;
 
 		// Transformar a formato que espera InvoiceDetail
-		const transformedTaxes = [{
-			taxId: selectedTax.id,
-			rate: extractNumber(selectedTax.currentRate),
-		}];
+		const transformedTaxes = [
+			{
+				taxId: selectedTax.id,
+				rate: extractNumber(selectedTax.currentRate),
+			},
+		];
 
 		// Actualizar los detalles CON recálculo
-		const updatedDetails = currentInvoice.details.map((detail: InvoiceDetail) => {
-			if (detail.productId === productId) {
-				// Crear un nuevo InvoiceDetail con los nuevos impuestos
-				const newDetail = new InvoiceDetail(
-					detail.productId,
-					detail.productName,
-					detail.quantity,
-					extractNumber(detail.unitPrice),
-					transformedTaxes
-				);
+		const updatedDetails = currentInvoice.details.map(
+			(detail: InvoiceDetail) => {
+				if (detail.productId === productId) {
+					// Crear un nuevo InvoiceDetail con los nuevos impuestos
+					const newDetail = new InvoiceDetail(
+						detail.productId,
+						detail.productName,
+						detail.quantity,
+						extractNumber(detail.unitPrice),
+						transformedTaxes,
+					);
 
-				return newDetail;
-			}
-			return detail;
-		});
+					return newDetail;
+				}
+				return detail;
+			},
+		);
 
 		// Crear una nueva instancia de Invoice con los detalles actualizados
 		const updatedInvoice = new Invoice(
 			currentInvoice.clientId,
-			currentInvoice.id
+			currentInvoice.id,
 		);
-		
+
 		// Asignar propiedades
 		updatedInvoice.details = updatedDetails;
 		if (currentInvoice.transactionId) {
@@ -272,7 +408,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 						<InvoicePDF
 							ref={componentRef}
 							invoice={currentInvoice}
-							client={selectedClient}
+							client={selectedClient as unknown as DomainClient}
 							invoiceNumber={formattedInvoiceNumber}
 						/>
 					)}
@@ -334,12 +470,14 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 												? (product.stock as { value: number }).value
 												: (product.stock as number)
 											: 0;
-										const isAtMaxStock = item.quantity >= stockValue;
-										
+
 										// Obtener el primer impuesto del item (si existe)
-										const currentTaxId = item.taxes.length > 0 
-											? item.taxes[0].taxId 
-											: (taxes.length > 0 ? taxes[0].id : "");
+										const currentTaxId =
+											item.taxes.length > 0
+												? item.taxes[0].taxId
+												: taxes.length > 0
+													? taxes[0].id
+													: "";
 
 										return (
 											<tr
@@ -352,38 +490,17 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 													</p>
 												</td>
 												<td className="px-2 py-3">
-													<div className="flex items-center justify-center border rounded-lg overflow-hidden h-7 scale-90 bg-background">
-														<Button
-															variant="ghost"
-															size="icon-xs"
-															onClick={() =>
-																handleUpdateQuantity(
-																	item.productId,
-																	-1,
-																	item.productName,
-																)
-															}
-														>
-															<Minus className="size-3" />
-														</Button>
-														<span className="text-xs font-black w-5 text-center">
-															{item.quantity}
-														</span>
-														<Button
-															variant="ghost"
-															size="icon-xs"
-															disabled={isAtMaxStock}
-															onClick={() =>
-																handleUpdateQuantity(
-																	item.productId,
-																	1,
-																	item.productName,
-																)
-															}
-														>
-															<Plus className="size-3" />
-														</Button>
-													</div>
+													<QuantityCell
+														item={item}
+														stockValue={stockValue}
+														onChange={(delta) =>
+															handleUpdateQuantity(
+																item.productId,
+																delta,
+																item.productName,
+															)
+														}
+													/>
 												</td>
 												<td className="px-2 py-3 text-right">
 													<span className="text-xs font-medium text-muted-foreground font-mono">
@@ -394,11 +511,14 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 													<select
 														value={String(currentTaxId)}
 														onChange={(e) => {
-															handleChangeTax(item.productId, parseInt(e.target.value));
+															handleChangeTax(
+																item.productId,
+																parseInt(e.target.value),
+															);
 														}}
 														className="h-7 text-[10px] px-2 rounded border border-input bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
 													>
-														{taxes.map((tax: any) => (
+														{taxes.map((tax: Tax) => (
 															<option key={tax.id} value={String(tax.id)}>
 																{extractNumber(tax.currentRate)}%
 															</option>
@@ -472,9 +592,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 					</div>
 
 					<Button
+						id="confirm-sale-button"
+						data-confirm-sale="true"
 						className="w-full h-12 text-sm font-bold gap-2"
 						disabled={
-							!currentInvoice || currentInvoice.details.length === 0 || isCreating
+							!currentInvoice ||
+							currentInvoice.details.length === 0 ||
+							isCreating
 						}
 						onClick={handleFinalize}
 					>

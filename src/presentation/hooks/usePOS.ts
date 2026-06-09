@@ -8,6 +8,12 @@ import { useApplication } from "../context/use-application";
 import { apiClient } from "@/infrastructure/api/api-client";
 import { Invoice } from "../../domain/entities/invoice.entity";
 
+interface Tax {
+	id: number;
+	name: string;
+	currentRate: number;
+}
+
 export const useTaxes = () => {
 	const { repositories } = useApplication();
 	const taxesQuery = useQuery({
@@ -15,10 +21,15 @@ export const useTaxes = () => {
 		queryFn: () => repositories.taxRepository.findAll(),
 	});
 
-	// El apiClient puede devolver { data: [...], total } o un array directo
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const taxesData = taxesQuery.data as any;
-	const taxes: any[] = taxesData?.data ?? taxesData ?? [];
+	// El repositorio puede devolver { data: [...], total } o un array directo.
+	// Se castea via unknown para no usar `as any`.
+	const taxesData = taxesQuery.data as unknown as
+		| { data?: Tax[] }
+		| Tax[]
+		| undefined;
+	const taxes: Tax[] = Array.isArray(taxesData)
+		? taxesData
+		: (taxesData?.data ?? []);
 
 	return {
 		data: taxes,

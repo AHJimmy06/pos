@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	useProducts,
 	type Product,
@@ -76,6 +76,14 @@ export const ProductsPage: React.FC = () => {
 		isDeleting,
 	} = useProducts(page, limit, search, searchField);
 
+	const [selectedIndex, setSelectedIndex] = useState(0);
+
+	// Keyboard shortcuts: j/k to move row selection, n = new, e = edit.
+	// Single-key shortcuts are ignored when focus is on a text-editing
+	// element (handled here in addition to the global hook).
+	// NOTE: Este useEffect se declara ABAJO de los handlers (openCreateDialog,
+	// openEditDialog) para evitar el warning de react-hooks/immutability que se
+	// dispara cuando un callback referencia variables declaradas después.
 	const [formData, setFormData] = useState<CreateProductDto>({
 		name: "",
 		price: 0,
@@ -132,6 +140,43 @@ export const ProductsPage: React.FC = () => {
 		setProductToDelete(product);
 		setIsDeleteDialogOpen(true);
 	};
+
+	// Keyboard shortcuts: j/k to move row selection, n = new, e = edit.
+	// Single-key shortcuts are ignored when focus is on a text-editing
+	// element (handled here in addition to the global hook).
+	useEffect(() => {
+		const isEditing = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return (
+				tag === "INPUT" ||
+				tag === "TEXTAREA" ||
+				tag === "SELECT" ||
+				el.isContentEditable
+			);
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			if (isEditing(e.target)) return;
+			if (products.length === 0) return;
+			if (e.key === "j") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.min(products.length - 1, i + 1));
+			} else if (e.key === "k") {
+				e.preventDefault();
+				setSelectedIndex((i) => Math.max(0, i - 1));
+			} else if (e.key === "n") {
+				e.preventDefault();
+				openCreateDialog();
+			} else if (e.key === "e") {
+				e.preventDefault();
+				const item = products[selectedIndex];
+				if (item) openEditDialog(item);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [products, selectedIndex]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -275,10 +320,16 @@ export const ProductsPage: React.FC = () => {
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-border/50">
-										{products.map((product) => (
+										{products.map((product, idx) => (
 											<tr
 												key={product.id}
-												className="bg-transparent hover:bg-muted/20 transition-colors"
+												aria-selected={idx === selectedIndex}
+												className={cn(
+													"transition-colors cursor-default",
+													idx === selectedIndex
+														? "bg-accent/60"
+														: "bg-transparent hover:bg-muted/20",
+												)}
 											>
 												<td className="px-6 py-4 font-medium text-muted-foreground">
 													#{product.id}

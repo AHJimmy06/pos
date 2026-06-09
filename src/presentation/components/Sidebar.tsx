@@ -106,11 +106,7 @@ export const Sidebar: React.FC = () => {
 							{user?.fullName}
 						</p>
 						<p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70">
-							{user?.role === "ADMINISTRATOR"
-								? "Admin"
-								: user?.role === "AUDITOR"
-									? "Auditor"
-									: "Vendedor"}
+							{user?.role === "ADMINISTRATOR" ? "Admin" : "Vendedor"}
 						</p>
 					</div>
 				</div>

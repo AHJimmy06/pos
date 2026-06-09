@@ -20,8 +20,7 @@ apiClient.interceptors.request.use(
 );
 
 // Función recursiva para normalizar objetos del dominio
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalize(obj: any): any {
+function normalize(obj: unknown): unknown {
 	if (Array.isArray(obj)) return obj.map(normalize);
 	if (obj === null || typeof obj !== "object" || obj instanceof Date)
 		return obj;
@@ -29,10 +28,10 @@ function normalize(obj: any): any {
 	// Evitar procesar objetos que ya son limpios o de librerías
 	if ("config" in obj && "headers" in obj && "request" in obj) return obj;
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const result: any = {};
-	for (const key in obj) {
-		let value = obj[key];
+	const result: Record<string, unknown> = {};
+	const source = obj as Record<string, unknown>;
+	for (const key of Object.keys(source)) {
+		let value = source[key];
 		let newKey = key;
 
 		// 1. Quitar guion bajo inicial (propiedades privadas serializadas)
@@ -45,9 +44,9 @@ function normalize(obj: any): any {
 			value &&
 			typeof value === "object" &&
 			"value" in value &&
-			Object.keys(value).length === 1
+			Object.keys(value as object).length === 1
 		) {
-			value = value.value;
+			value = (value as { value: unknown }).value;
 		}
 
 		result[newKey] = normalize(value);
@@ -56,17 +55,12 @@ function normalize(obj: any): any {
 }
 
 // Extraer mensaje de error de forma legible
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractErrorMessage(errorObj: any): string {
-	if (typeof errorObj?.message === "string") {
-		return errorObj.message;
-	}
-	if (Array.isArray(errorObj?.message)) {
-		return errorObj.message.join(", ");
-	}
-	if (typeof errorObj?.error === "string") {
-		return errorObj.error;
-	}
+function extractErrorMessage(errorObj: unknown): string {
+	if (!errorObj || typeof errorObj !== "object") return "Error desconocido";
+	const e = errorObj as { message?: unknown; error?: unknown };
+	if (typeof e.message === "string") return e.message;
+	if (Array.isArray(e.message)) return e.message.join(", ");
+	if (typeof e.error === "string") return e.error;
 	return "Error desconocido";
 }
 

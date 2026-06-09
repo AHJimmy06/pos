@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useProducts } from "../hooks/useProducts";
 import { useTaxes } from "../hooks/usePOS";
+import type { Tax } from "../hooks/useTaxes";
 import { usePOSStore } from "../store/usePOSStore";
 import { useApplication } from "../context/use-application";
 import { Package, ChevronDown, Plus, AlertCircle } from "lucide-react";
@@ -24,8 +25,9 @@ const PAGE_SIZE = 5;
 export const ProductGrid: React.FC = () => {
 	const { products, isLoading } = useProducts();
 	const taxesData = useTaxes();
-	const taxes =
-		(taxesData as any)?.taxes || (taxesData as any)?.data || taxesData || [];
+	// useTaxes() de usePOS.ts devuelve { data: Tax[]; isLoading; isError }
+	// con data siendo un array directo (no paginado).
+	const taxes: Tax[] = taxesData.data;
 	const { useCases } = useApplication();
 	const { currentInvoice, setInvoice, selectedClient } = usePOSStore();
 	const [isOpen, setIsOpen] = useState(false);
@@ -36,13 +38,18 @@ export const ProductGrid: React.FC = () => {
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
-	// Adapt plain products to have hasStock and canSell
-	const adaptedProducts: ProductType[] = (products || []).map((p) => ({
-		...p,
-		taxIds: (p as any).taxIds || [],
-		hasStock: p.stock > 0,
-		canSell: p.stock > 0 && p.isActive,
-	}));
+	// Adapt Product (domain entity con price: Money, stock: StockQuantity)
+	// al shape plano que necesita la UI. Se castea via unknown para no usar
+	// `as any` (los VOs exponen .value, pero TS no los ve como number).
+	const adaptedProducts: ProductType[] = (products || []).map((p) => {
+		const flat = p as unknown as ProductType;
+		return {
+			...flat,
+			taxIds: flat.taxIds ?? [],
+			hasStock: flat.stock > 0,
+			canSell: flat.stock > 0 && flat.isActive,
+		};
+	});
 
 	const filteredProducts = adaptedProducts.filter(
 		(p) =>
@@ -104,7 +111,7 @@ export const ProductGrid: React.FC = () => {
 
 			const updatedInvoice = useCases.addItem.execute(
 				currentInvoice,
-				product as any,
+				product as unknown as Parameters<typeof useCases.addItem.execute>[1],
 				1,
 				productTaxes,
 			);

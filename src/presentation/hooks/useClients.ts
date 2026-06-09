@@ -8,6 +8,7 @@ export interface Client {
 	email: string;
 	phone: string;
 	address: string;
+	cedula?: string | null;
 	isActive: boolean;
 	get fullName(): string;
 }
@@ -18,9 +19,11 @@ export interface CreateClientDto {
 	email: string;
 	phone?: string;
 	address?: string;
+	cedula: string;
 }
 
-export interface UpdateClientDto extends Partial<CreateClientDto> {
+export interface UpdateClientDto
+	extends Partial<Omit<CreateClientDto, "cedula">> {
 	isActive?: boolean;
 }
 
@@ -31,26 +34,28 @@ interface PaginatedResponse<T> {
 
 // Helper para extraer payload de respuestas NestJS
 function getPayload<T>(response: unknown): T | null {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const res = response as any;
+	const res = response as { data?: unknown } | null | undefined;
 	const data = res?.data;
 
 	if (!data) return null;
 
 	// Si tiene estructura NestJS wrapper { success, data: ... }
-	if (data.success !== undefined && data.data !== undefined) {
-		const inner = data.data;
-		// Si es paginado
-		if (
-			inner &&
-			typeof inner === "object" &&
-			"data" in inner &&
-			"total" in inner
-		) {
+	if (typeof data === "object" && data !== null) {
+		const wrapper = data as { success?: unknown; data?: unknown };
+		if (wrapper.success !== undefined && wrapper.data !== undefined) {
+			const inner = wrapper.data;
+			// Si es paginado
+			if (
+				inner &&
+				typeof inner === "object" &&
+				"data" in inner &&
+				"total" in inner
+			) {
+				return inner as T;
+			}
+			// Si es simple
 			return inner as T;
 		}
-		// Si es simple
-		return inner as T;
 	}
 
 	// Si no tiene wrapper
@@ -97,7 +102,7 @@ export const useClients = (
 			const response = await apiClient.get(`/clients?${params}`);
 			// Extraer el payload correctamente
 			const payload = getPayload<PaginatedResponse<Client>>(response);
-			
+
 			// Validar que sea un objeto con estructura correcta
 			if (
 				payload &&
@@ -167,9 +172,7 @@ export const useClients = (
 			},
 		})),
 		total: (clientsData?.total as number) ?? 0,
-		totalPages: Math.ceil(
-			((clientsData?.total as number) ?? 0) / limit,
-		),
+		totalPages: Math.ceil(((clientsData?.total as number) ?? 0) / limit),
 		limit,
 		isLoading: clientsQuery.isLoading,
 		isError: clientsQuery.isError,

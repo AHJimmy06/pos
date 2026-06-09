@@ -77,8 +77,13 @@ export const useAuditSales = (): UseAuditSalesResult => {
 				const wrapper = response.data as { data?: unknown };
 				const inner = wrapper?.data;
 				return (inner ?? null) as AuditInvoice | null;
-			} catch (error: any) {
-				if (error.response?.status === 404) {
+			} catch (error) {
+				if (
+					error &&
+					typeof error === "object" &&
+					"response" in error &&
+					(error as { response?: { status?: number } }).response?.status === 404
+				) {
 					return null;
 				}
 				throw error;

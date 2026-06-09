@@ -7,6 +7,8 @@ export interface Product {
 	price: number;
 	stock: number;
 	isActive: boolean;
+	taxIds: number[];
+	hasStock: boolean;
 }
 
 export interface CreateProductDto {
@@ -66,14 +68,16 @@ export const useProducts = (
 				params.append("search", search);
 				params.append("searchField", searchField);
 			}
-			const response = await apiClient.get<PaginatedResponse<Product>>(`/products?${params}`);
-				// interceptor preserves NestJS wrapper in response.data → extract inner payload
-				const wrapper = response.data as { data?: unknown };
-				const inner = wrapper?.data;
-				if (inner && typeof inner === "object" && "data" in inner) {
-					return inner as PaginatedResponse<Product>;
-				}
-				return { data: [], total: 0 };
+			const response = await apiClient.get<PaginatedResponse<Product>>(
+				`/products?${params}`,
+			);
+			// interceptor preserves NestJS wrapper in response.data → extract inner payload
+			const wrapper = response.data as { data?: unknown };
+			const inner = wrapper?.data;
+			if (inner && typeof inner === "object" && "data" in inner) {
+				return inner as PaginatedResponse<Product>;
+			}
+			return { data: [], total: 0 };
 		},
 	});
 

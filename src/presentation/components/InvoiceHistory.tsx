@@ -26,7 +26,6 @@ import { Client as DomainClient } from "@/domain/entities/client.entity";
 const PAGE_SIZE = 5;
 
 // Helper to create a fallback client when client is not found
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createFallbackClient = (clientId: number, name: string): DomainClient => {
 	const fallback = {
 		id: clientId,
@@ -58,22 +57,17 @@ export const InvoiceHistory = () => {
 
 	const getClientName = (clientId: number | undefined) => {
 		if (!clientId) return "N/A";
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const client = (clients as any[]).find(
-			(c: ClientInterface) => c.id === clientId,
-		);
-		return (
-			(client as any)?.fullName ||
-			(client ? `${client.firstName} ${client.lastName}` : "N/A")
-		);
+		const client = clients.find((c: ClientInterface) => c.id === clientId);
+		return client ? client.fullName : "N/A";
 	};
 
 	const getClient = (clientId: number | undefined): DomainClient | null => {
 		if (!clientId) return null;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		return (
-			(clients as any[]).find((c: ClientInterface) => c.id === clientId) || null
-		);
+		const found = clients.find((c: ClientInterface) => c.id === clientId);
+		// Mismo patrón que createFallbackClient: el shape del hook (interface
+		// con email: string) es estructuralmente compatible con la entity
+		// (con email: Email). Se castea via unknown para evitar `as any`.
+		return (found as unknown as DomainClient | undefined) ?? null;
 	};
 
 	const handleViewInvoice = async (invoiceId: number) => {
@@ -225,16 +219,24 @@ export const InvoiceHistory = () => {
 											<div className="flex items-center gap-3 text-xs text-muted-foreground">
 												<span>
 													{inv.issueDate
-														? new Date(inv.issueDate).toLocaleDateString("es-AR")
+														? new Date(inv.issueDate).toLocaleDateString(
+																"es-AR",
+															)
 														: "Sin fecha"}
 												</span>
 												<span>•</span>
-												<span>{inv.totalSnapshot ? `$${inv.totalSnapshot.toFixed(2)}` : "$0.00"}</span>
+												<span>
+													{inv.totalSnapshot
+														? `$${inv.totalSnapshot.toFixed(2)}`
+														: "$0.00"}
+												</span>
 											</div>
 										</div>
 										<div className="flex items-center gap-2 ml-4">
 											<span className="font-black text-primary text-sm">
-												{inv.totalSnapshot ? `$${inv.totalSnapshot.toFixed(2)}` : "$0.00"}
+												{inv.totalSnapshot
+													? `$${inv.totalSnapshot.toFixed(2)}`
+													: "$0.00"}
 											</span>
 											<Button
 												variant="ghost"

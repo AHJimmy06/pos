@@ -74,7 +74,7 @@ function App() {
 								<Route
 									path="audit/sales"
 									element={
-										<ProtectedRoute allowedRoles={["ADMINISTRATOR", "AUDITOR"]}>
+										<ProtectedRoute allowedRoles={["ADMINISTRATOR"]}>
 											<AuditSalesPage />
 										</ProtectedRoute>
 									}

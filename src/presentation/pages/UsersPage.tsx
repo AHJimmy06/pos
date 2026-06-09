@@ -244,7 +244,7 @@ export const UsersPage: React.FC = () => {
 							Usuarios
 						</h1>
 						<p className="text-muted-foreground">
-							GestiÃ³n de personal y permisos
+							Gestión de personal y permisos
 						</p>
 					</div>
 				</div>
@@ -609,7 +609,6 @@ export const UsersPage: React.FC = () => {
 								>
 									<option value="SELLER">Vendedor</option>
 									<option value="ADMINISTRATOR">Administrador</option>
-									<option value="AUDITOR">Auditor</option>
 								</select>
 							</div>
 						)}
