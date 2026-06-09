@@ -75,19 +75,30 @@ export const InvoicePDF = forwardRef<HTMLDivElement, Props>(({ invoice, client, 
       </table>
 
       {/* DESGLOSE FINAL */}
+      {/*
+        Los totales del header (Subtotal / Impuestos / TOTAL) se leen de los
+        snapshots (`*Snapshot`) en lugar de calcularse desde los detalles.
+        Razon: el SEED del back genera invoice_details con `pick()` random,
+        asi que la suma de (unitPrice * quantity) por item NO coincide con
+        el `subtotal_snapshot` del header. Los snapshots son la fuente de
+        verdad para los totales de la factura (es lo que ve el usuario en
+        el modal de detalles y lo que se persiste en la BDD).
+        Los totales por item en la tabla de arriba se siguen calculando
+        desde (unitPrice * quantity) porque cada item es independiente.
+      */}
       <div className="flex justify-end">
         <div className="w-64 space-y-2">
           <div className="flex justify-between text-sm">
             <span>Subtotal Neto:</span>
-            <span>{invoice.subtotal.toString()}</span>
+            <span>${invoice.subtotalSnapshot.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm border-b border-black pb-2">
             <span>Impuestos Totales:</span>
-            <span>{invoice.taxTotal.toString()}</span>
+            <span>${invoice.taxTotalSnapshot.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-xl font-bold pt-2">
             <span>TOTAL:</span>
-            <span>{invoice.total.toString()}</span>
+            <span>${invoice.totalSnapshot.toFixed(2)}</span>
           </div>
         </div>
       </div>
