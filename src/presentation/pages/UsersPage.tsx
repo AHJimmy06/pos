@@ -25,7 +25,11 @@ import {
 	Users,
 	Search,
 	Pencil,
+	AlertCircle,
 } from "lucide-react";
+
+const cn = (...classes: (string | boolean | undefined)[]) =>
+	classes.filter(Boolean).join(" ");
 
 interface User {
 	id: number;
@@ -178,10 +182,25 @@ export const UsersPage: React.FC = () => {
 		setOperationError(null);
 	};
 
+	const isPasswordValid = (pass: string) => {
+		const regex =
+			/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,10}$/;
+		return regex.test(pass);
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setIsSubmitting(true);
 		setOperationError(null);
+
+		if (!isEditMode && !isPasswordValid(formData.password)) {
+			setOperationError(
+				"La contraseña no cumple con los requisitos de seguridad.",
+			);
+			setIsSubmitting(false);
+			return;
+		}
+
 		try {
 			if (isEditMode && editingUserId) {
 				await apiClient.put(`/users/${editingUserId}`, {
@@ -207,8 +226,11 @@ export const UsersPage: React.FC = () => {
 			setIsDialogOpen(false);
 			queryClient.invalidateQueries({ queryKey: ["users"] });
 		} catch (err: any) {
-			console.error("Error en la operaciÃ³n:", err);
-			setOperationError(err.message || "Error desconocido");
+			console.error("Error en la operación:", err);
+			// Extraer mensaje de error específico si existe
+			const msg =
+				err.response?.data?.message || err.message || "Error desconocido";
+			setOperationError(Array.isArray(msg) ? msg.join(", ") : msg);
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -668,27 +690,86 @@ export const UsersPage: React.FC = () => {
 							</span>
 						</div>
 						<div className="space-y-2">
-							<label className="text-sm font-medium">Contraseña</label>
-							<Input
-								type="password"
-								value={formData.password}
-								onChange={(e) =>
-									setFormData({ ...formData, password: e.target.value })
-								}
-								required={!isEditMode}
-								disabled={isEditMode}
-								placeholder={
-									isEditMode
-										? "No se puede editar desde aquí"
-										: "Mínimo 8 caracteres"
-								}
-								minLength={isEditMode ? 0 : 8}
-							/>
+							<label
+								className={cn(
+									"text-sm font-medium",
+									!isEditMode &&
+										formData.password &&
+										!isPasswordValid(formData.password) &&
+										"text-destructive",
+								)}
+							>
+								Contraseña
+							</label>
+							<div className="relative">
+								<Input
+									type="password"
+									value={formData.password}
+									onChange={(e) =>
+										setFormData({ ...formData, password: e.target.value })
+									}
+									required={!isEditMode}
+									disabled={isEditMode}
+									placeholder={
+										isEditMode
+											? "No se puede editar desde aquí"
+											: "Mínimo 8 caracteres"
+									}
+									className={cn(
+										!isEditMode &&
+											formData.password &&
+											!isPasswordValid(formData.password) &&
+											"border-destructive focus-visible:ring-destructive",
+									)}
+								/>
+								{!isEditMode &&
+									formData.password &&
+									!isPasswordValid(formData.password) && (
+										<AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-destructive" />
+									)}
+							</div>
 							{!isEditMode && (
-								<p className="text-[10px] text-muted-foreground">
-									8-10 caracteres, al menos 1 mayúscula, 1 minúscula, 1 número y
-									1 carácter especial (@$!%*?&)
-								</p>
+								<div className="space-y-1">
+									<p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
+										Requisitos de seguridad:
+									</p>
+									<ul className="grid grid-cols-2 gap-x-4 gap-y-1">
+										{[
+											{ label: "8-10 caracteres", test: (p: string) => p.length >= 8 && p.length <= 10 },
+											{ label: "Una mayúscula", test: (p: string) => /[A-Z]/.test(p) },
+											{ label: "Una minúscula", test: (p: string) => /[a-z]/.test(p) },
+											{ label: "Un número", test: (p: string) => /\d/.test(p) },
+											{ label: "Carácter especial", test: (p: string) => /[@$!%*?&]/.test(p) },
+										].map((req, i) => {
+											const met = req.test(formData.password);
+											return (
+												<li
+													key={i}
+													className={cn(
+														"text-[9px] flex items-center gap-1",
+														formData.password
+															? met
+																? "text-emerald-600"
+																: "text-destructive"
+															: "text-muted-foreground",
+													)}
+												>
+													<div
+														className={cn(
+															"size-1 rounded-full",
+															formData.password
+																? met
+																	? "bg-emerald-600"
+																	: "bg-destructive"
+																: "bg-muted-foreground/40",
+														)}
+													/>
+													{req.label}
+												</li>
+											);
+										})}
+									</ul>
+								</div>
 							)}
 						</div>
 						{!isEditMode && (
