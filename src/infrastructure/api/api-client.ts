@@ -1,7 +1,7 @@
 import axios, { type AxiosError } from "axios";
 
 export const apiClient = axios.create({
-	baseURL: import.meta.env.VITE_API_URL || "http://https://pos-api-2fwq.onrender.com/api",
+	baseURL:"http://https://pos-api-2fwq.onrender.com/api",
 	headers: {
 		"Content-Type": "application/json",
 	},
