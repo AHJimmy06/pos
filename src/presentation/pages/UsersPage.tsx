@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/infrastructure/api/api-client";
+import { useAuth } from "../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ interface UsersResponse {
 }
 
 export const UsersPage: React.FC = () => {
+<<<<<<< HEAD
     const { currentUser } = useAuth(); // <--- OBTENER EL USUARIO LOGEADO
     
     const [page, setPage] = useState(1);
@@ -67,6 +69,25 @@ export const UsersPage: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingUserId, setEditingUserId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+=======
+	const { user } = useAuth();
+	const [page, setPage] = useState(1);
+	const [search, setSearch] = useState("");
+	const [searchInput, setSearchInput] = useState("");
+	const [currentPageInput, setCurrentPageInput] = useState("");
+	// Filtros adicionales (filtran en cliente sobre la lista que devuelve el back).
+	// Para la demo con 100 users alcanza; si crece, mover al back.
+	const [roleFilter, setRoleFilter] = useState<
+		"ALL" | "ADMINISTRATOR" | "SELLER"
+	>("ALL");
+	const [statusFilter, setStatusFilter] = useState<
+		"ALL" | "active" | "inactive"
+	>("ALL");
+	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [isEditMode, setIsEditMode] = useState(false);
+	const [editingUserId, setEditingUserId] = useState<number | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+>>>>>>> 0906deb4c3574c6c82c30354f024aa5f1f162349
 
     const [formData, setFormData] = useState({
         username: "",
@@ -142,9 +163,31 @@ export const UsersPage: React.FC = () => {
         },
     });
 
+<<<<<<< HEAD
     const users: User[] = data?.data ?? [];
     const total: number = data?.total ?? 0;
     const totalPages = Math.ceil(total / 15);
+=======
+	// Filtros aplicados en cliente sobre el resultado del fetch.
+	// search filtra por email (case-insensitive); los selects filtran por
+	// rol y estado. "ALL" significa sin filtro para ese eje.
+	// ADEMÁS: Filtramos para que el usuario logueado no se vea a sí mismo en la lista.
+	const filteredUsers = users.filter((u) => {
+		if (user && u.id === user.id) {
+			return false;
+		}
+		if (search && !u.email.toLowerCase().includes(search.toLowerCase())) {
+			return false;
+		}
+		if (roleFilter !== "ALL" && !u.roles.includes(roleFilter)) {
+			return false;
+		}
+		if (statusFilter !== "ALL" && u.isActive !== (statusFilter === "active")) {
+			return false;
+		}
+		return true;
+	});
+>>>>>>> 0906deb4c3574c6c82c30354f024aa5f1f162349
 
     // Filtros aplicados en cliente sobre el resultado del fetch.
     const filteredUsers = users.filter((u) => {
