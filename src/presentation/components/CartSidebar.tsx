@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import { InvoiceDetail, Invoice } from "@/domain/entities/invoice.entity";
 import { Client as DomainClient } from "@/domain/entities/client.entity";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { InvoicePDF } from "./InvoicePDF";
+import { InvoicePrintModal } from "./InvoicePrintModal";
 import { ClientSelectorModal } from "./ClientSelectorModal";
 import {
 	Card,
@@ -169,50 +170,7 @@ const QuantityCell: React.FC<{
 	);
 };
 
-// PDF Modal que aparece automáticamente tras una venta exitosa
-const InvoicePrintModal: React.FC<{
-	invoice: ReturnType<typeof usePOSStore.getState>["currentInvoice"];
-	selectedClient: ReturnType<typeof usePOSStore.getState>["selectedClient"];
-	invoiceNumber: string;
-	onClose: () => void;
-}> = ({ invoice, selectedClient, invoiceNumber, onClose }) => {
-	const componentRef = useRef<HTMLDivElement>(null);
-	const handlePrint = useReactToPrint({
-		contentRef: componentRef,
-		documentTitle: `Factura_${invoiceNumber}`,
-	});
-
-	// Auto-print al montar
-	useEffect(() => {
-		handlePrint();
-	}, [handlePrint]);
-
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-			<div className="bg-background rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-				<div className="flex items-center justify-between p-6 border-b border-border bg-card">
-					<h2 className="font-black text-lg">Factura #{invoiceNumber}</h2>
-					<div className="flex gap-2">
-						<Button variant="outline" size="sm" onClick={handlePrint}>
-							Imprimir
-						</Button>
-						<Button variant="ghost" size="sm" onClick={onClose}>
-							Cerrar
-						</Button>
-					</div>
-				</div>
-				<div className="p-8 bg-muted/30 flex justify-center">
-					<InvoicePDF
-						ref={componentRef}
-						invoice={invoice!}
-						client={selectedClient as unknown as DomainClient}
-						invoiceNumber={invoiceNumber}
-					/>
-				</div>
-			</div>
-		</div>
-	);
-};
+// (el helper de auto-print se inlinea en el useEffect del componente que lo necesita)
 
 // Helper mejorado para formatear valores Money o números
 const formatMoney = (value: unknown): string => {
@@ -271,8 +229,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
 	// Estado para el modal de impresión tras venta exitosa
 	const [printData, setPrintData] = useState<{
-		invoice: typeof currentInvoice;
-		client: typeof selectedClient;
+		invoice: NonNullable<typeof currentInvoice>;
+		client: DomainClient;
 		number: string;
 	} | null>(null);
 
@@ -384,7 +342,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 			// Guardar datos para el modal de impresión antes de limpiar
 			setPrintData({
 				invoice: currentInvoice,
-				client: selectedClient,
+				client: selectedClient as unknown as DomainClient,
 				number: formattedInvoiceNumber,
 			});
 			onSuccess?.();

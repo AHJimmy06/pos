@@ -13,6 +13,7 @@ import {
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
+	DialogFooter,
 } from "@/components/ui/dialog";
 import {
 	Loader2,
@@ -22,7 +23,11 @@ import {
 	FileText,
 	Eye,
 	XCircle,
+	Printer,
 } from "lucide-react";
+import { InvoicePrintModal } from "../components/InvoicePrintModal";
+import { Invoice, InvoiceDetail } from "@/domain/entities/invoice.entity";
+import { Client as DomainClient } from "@/domain/entities/client.entity";
 
 type InvoiceStatus = "DRAFT" | "CONFIRMED" | "CANCELLED";
 
@@ -80,6 +85,15 @@ export const InvoicesPage: React.FC = () => {
 		"ALL",
 	);
 
+	// Estado para reimpresion: cuando se setea, se abre el InvoicePrintModal.
+	// InvoicesPage NO auto-imprime (al contrario de CartSidebar): el usuario
+	// debe poder VER el modal antes de decidir imprimir.
+	const [printData, setPrintData] = useState<{
+		invoice: Invoice;
+		client: DomainClient;
+		number: string;
+	} | null>(null);
+
 	const {
 		invoices,
 		total,
@@ -130,6 +144,57 @@ export const InvoicesPage: React.FC = () => {
 	};
 
 	const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+	// Mapper: convierte el InvoiceRow (shape de la API) a las entities del
+	// dominio que espera InvoicePrintModal/InvoicePDF. La estructura es
+	// estructuralmente compatible; usamos unknown para el cast.
+	const buildPrintData = (row: InvoiceRow) => {
+		const invoice = new Invoice(row.client?.id ?? 0, row.id);
+		invoice.issueDate = new Date(row.issueDate);
+		invoice.transactionId = row.transactionId;
+		invoice.status = row.status;
+		invoice.paymentMethod = row.paymentMethod;
+		invoice.userId = row.seller?.id;
+		invoice.clientNameSnapshot = row.client
+			? `${row.client.firstName ?? ""} ${row.client.lastName ?? ""}`.trim()
+			: undefined;
+		invoice.clientEmailSnapshot = row.client?.email ?? undefined;
+		invoice.sellerNameSnapshot = row.seller
+			? `${row.seller.name} ${row.seller.lastName}`.trim()
+			: undefined;
+		invoice.details = row.details.map(
+			(d) =>
+				new InvoiceDetail(
+					d.productId,
+					d.productName,
+					d.quantity,
+					d.unitPriceSnapshot,
+					[{ taxId: 0, rate: d.taxRate }],
+				),
+		);
+
+		const client = row.client
+			? new DomainClient(
+					row.client.id,
+					row.client.firstName ?? "",
+					row.client.lastName ?? "",
+					row.client.email ?? "",
+					row.client.phone ?? "",
+					row.client.address ?? "",
+				)
+			: new DomainClient(0, "Sin cliente", "", "", "", "");
+
+		return {
+			invoice: invoice as unknown as Invoice,
+			client: client as unknown as DomainClient,
+			number: row.id.toString().padStart(6, "0"),
+		};
+	};
+
+	const handleReprint = () => {
+		if (!selectedInvoice) return;
+		setPrintData(buildPrintData(selectedInvoice));
+	};
 
 	const openDetails = async (invoice: { id: number }) => {
 		setIsDetailsOpen(true);
@@ -664,8 +729,36 @@ export const InvoicesPage: React.FC = () => {
 							</div>
 						</div>
 					)}
+					<DialogFooter>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={handleReprint}
+							disabled={!selectedInvoice || isLoadingDetails}
+						>
+							<Printer className="size-4 mr-2" />
+							Imprimir
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setIsDetailsOpen(false)}
+						>
+							Cerrar
+						</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Modal de reimpresion (se abre al hacer click en "Imprimir") */}
+			{printData && (
+				<InvoicePrintModal
+					invoice={printData.invoice}
+					selectedClient={printData.client}
+					invoiceNumber={printData.number}
+					onClose={() => setPrintData(null)}
+				/>
+			)}
 		</div>
 	);
 };
