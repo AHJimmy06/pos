@@ -80,6 +80,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [createForm, setCreateForm] = useState<NewClientForm>(EMPTY_FORM);
+	const [createError, setCreateError] = useState<string | null>(null);
 
 	const queryClient = useQueryClient();
 	const { selectedClient, setSelectedClient, clear } = usePOSStore();
@@ -104,6 +105,7 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 			) as (Client & { id: number }) | undefined;
 			setIsCreateOpen(false);
 			setCreateForm(EMPTY_FORM);
+			setCreateError(null);
 			await queryClient.invalidateQueries({ queryKey: ["clients"] });
 			// Auto-select the newly created client
 			if (created && created.id) {
@@ -116,9 +118,11 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 				setSearchInput("");
 			}
 		},
-		onError: (err) => {
+		onError: (err: any) => {
 			console.error("Error creando cliente:", err);
-			alert(err.message || "No se pudo crear el cliente.");
+			const msg =
+				err.response?.data?.message || err.message || "Error al crear cliente";
+			setCreateError(Array.isArray(msg) ? msg[0] : msg);
 		},
 	});
 
@@ -126,6 +130,27 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 		e.preventDefault();
 		setSearch(searchInput);
 		setPage(1);
+	};
+
+	const handleCreateSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		setCreateError(null);
+
+		const cedula = createForm.cedula.trim();
+		if (!cedula) {
+			setCreateError("La cédula es obligatoria");
+			return;
+		}
+		if (!/^\d{10}$/.test(cedula)) {
+			setCreateError("La cédula debe tener exactamente 10 dígitos");
+			return;
+		}
+		if (!isValidEcuadorianCedula(cedula)) {
+			setCreateError("La cédula no es válida (dígito verificador incorrecto)");
+			return;
+		}
+
+		createClientMutation.mutate(createForm);
 	};
 
 	const handlePageInputSubmit = (e: React.FormEvent) => {
@@ -519,17 +544,15 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 							automáticamente.
 						</DialogDescription>
 					</DialogHeader>
-					<form
-						className="space-y-3"
-						onSubmit={(e) => {
-							e.preventDefault();
-							if (!isValidEcuadorianCedula(createForm.cedula)) {
-								alert("Por favor, ingresa una cédula ecuatoriana válida.");
-								return;
-							}
-							createClientMutation.mutate(createForm);
-						}}
-					>
+
+					{createError && (
+						<div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+							<AlertCircle className="size-4 flex-shrink-0" />
+							{createError}
+						</div>
+					)}
+
+					<form className="space-y-3" onSubmit={handleCreateSubmit}>
 						<div className="grid grid-cols-2 gap-3">
 							<div className="space-y-1.5">
 								<Label htmlFor="new-client-firstName">Nombre</Label>
@@ -537,13 +560,20 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 									id="new-client-firstName"
 									value={createForm.firstName}
 									onChange={(e) =>
-										setCreateForm({ ...createForm, firstName: e.target.value })
+										setCreateForm({
+											...createForm,
+											firstName: e.target.value.slice(0, 15),
+										})
 									}
 									required
-									minLength={2}
-									maxLength={100}
+									maxLength={15}
 									placeholder="Juan"
 								/>
+								<div className="flex justify-end">
+									<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+										{createForm.firstName.length}/15
+									</span>
+								</div>
 							</div>
 							<div className="space-y-1.5">
 								<Label htmlFor="new-client-lastName">Apellido</Label>
@@ -551,15 +581,23 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 									id="new-client-lastName"
 									value={createForm.lastName}
 									onChange={(e) =>
-										setCreateForm({ ...createForm, lastName: e.target.value })
+										setCreateForm({
+											...createForm,
+											lastName: e.target.value.slice(0, 15),
+										})
 									}
 									required
-									minLength={2}
-									maxLength={100}
+									maxLength={15}
 									placeholder="Pérez"
 								/>
+								<div className="flex justify-end">
+									<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+										{createForm.lastName.length}/15
+									</span>
+								</div>
 							</div>
 						</div>
+
 						<div className="space-y-1.5">
 							<Label
 								htmlFor="new-client-cedula"
@@ -569,18 +607,25 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 										"text-destructive",
 								)}
 							>
-								Cédula / RUC
+								Cédula <span className="text-destructive">*</span>
 							</Label>
 							<div className="relative">
 								<Input
 									id="new-client-cedula"
 									value={createForm.cedula}
-									onChange={(e) =>
-										setCreateForm({ ...createForm, cedula: e.target.value })
-									}
+									onChange={(e) => {
+										const digits = e.target.value
+											.replace(/\D/g, "")
+											.slice(0, 10);
+										setCreateForm({ ...createForm, cedula: digits });
+									}}
 									required
 									placeholder="Ej: 1712345678"
+									maxLength={10}
+									inputMode="numeric"
+									pattern="\d{10}"
 									className={cn(
+										"font-mono",
 										createForm.cedula &&
 											!isValidEcuadorianCedula(createForm.cedula) &&
 											"border-destructive focus-visible:ring-destructive",
@@ -591,38 +636,28 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 										<AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-destructive" />
 									)}
 							</div>
-							{createForm.cedula && !isValidEcuadorianCedula(createForm.cedula) && (
-								<p className="text-[10px] font-medium text-destructive">
-									Cédula ecuatoriana inválida
+							<div className="flex justify-between items-center px-0.5">
+								<p
+									className={cn(
+										"text-[10px] font-bold uppercase tracking-tight",
+										createForm.cedula &&
+											!isValidEcuadorianCedula(createForm.cedula)
+											? "text-destructive"
+											: "text-muted-foreground",
+									)}
+								>
+									{createForm.cedula && !isValidEcuadorianCedula(createForm.cedula)
+										? createForm.cedula.length < 10
+											? `Faltan ${10 - createForm.cedula.length} dígitos`
+											: "Cédula inválida"
+										: "10 dígitos numéricos"}
 								</p>
-							)}
+								<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+									{createForm.cedula.length}/10
+								</span>
+							</div>
 						</div>
-						<div className="space-y-1.5">
-							<Label htmlFor="new-client-phone">Teléfono</Label>
-							<Input
-								id="new-client-phone"
-								value={createForm.phone}
-								onChange={(e) =>
-									setCreateForm({ ...createForm, phone: e.target.value })
-								}
-								required
-								maxLength={50}
-								placeholder="0991234567"
-							/>
-						</div>
-						<div className="space-y-1.5">
-							<Label htmlFor="new-client-address">Dirección</Label>
-							<Input
-								id="new-client-address"
-								value={createForm.address}
-								onChange={(e) =>
-									setCreateForm({ ...createForm, address: e.target.value })
-								}
-								required
-								maxLength={255}
-								placeholder="Av. Siempre Viva 123"
-							/>
-						</div>
+
 						<div className="space-y-1.5">
 							<Label htmlFor="new-client-email">Correo Electrónico</Label>
 							<Input
@@ -630,18 +665,74 @@ export const ClientSelectorModal: React.FC<ClientSelectorModalProps> = ({
 								type="email"
 								value={createForm.email}
 								onChange={(e) =>
-									setCreateForm({ ...createForm, email: e.target.value })
+									setCreateForm({
+										...createForm,
+										email: e.target.value.slice(0, 40),
+									})
 								}
 								required
-								maxLength={255}
+								maxLength={40}
 								placeholder="cliente@example.com"
 							/>
+							<div className="flex justify-end">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+									{createForm.email.length}/40
+								</span>
+							</div>
 						</div>
-						<DialogFooter className="gap-2">
+
+						<div className="space-y-1.5">
+							<Label htmlFor="new-client-phone">
+								Teléfono (solo números)
+							</Label>
+							<Input
+								id="new-client-phone"
+								value={createForm.phone}
+								onChange={(e) => {
+									const digits = e.target.value
+										.replace(/\D/g, "")
+										.slice(0, 10);
+									setCreateForm({ ...createForm, phone: digits });
+								}}
+								maxLength={10}
+								placeholder="0991234567"
+							/>
+							<div className="flex justify-end">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+									{createForm.phone.length}/10
+								</span>
+							</div>
+						</div>
+
+						<div className="space-y-1.5">
+							<Label htmlFor="new-client-address">Dirección</Label>
+							<Input
+								id="new-client-address"
+								value={createForm.address}
+								onChange={(e) =>
+									setCreateForm({
+										...createForm,
+										address: e.target.value.slice(0, 50),
+									})
+								}
+								maxLength={50}
+								placeholder="Av. Siempre Viva 123"
+							/>
+							<div className="flex justify-end">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+									{createForm.address.length}/50
+								</span>
+							</div>
+						</div>
+
+						<DialogFooter className="pt-2">
 							<Button
 								type="button"
 								variant="outline"
-								onClick={() => setIsCreateOpen(false)}
+								onClick={() => {
+									setIsCreateOpen(false);
+									setCreateError(null);
+								}}
 								disabled={createClientMutation.isPending}
 							>
 								Cancelar
