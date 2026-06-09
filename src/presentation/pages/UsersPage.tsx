@@ -47,6 +47,14 @@ export const UsersPage: React.FC = () => {
 	const [search, setSearch] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [currentPageInput, setCurrentPageInput] = useState("");
+	// Filtros adicionales (filtran en cliente sobre la lista que devuelve el back).
+	// Para la demo con 100 users alcanza; si crece, mover al back.
+	const [roleFilter, setRoleFilter] = useState<
+		"ALL" | "ADMINISTRATOR" | "SELLER"
+	>("ALL");
+	const [statusFilter, setStatusFilter] = useState<
+		"ALL" | "active" | "inactive"
+	>("ALL");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [editingUserId, setEditingUserId] = useState<number | null>(null);
@@ -119,6 +127,22 @@ export const UsersPage: React.FC = () => {
 	const users: User[] = data?.data ?? [];
 	const total: number = data?.total ?? 0;
 	const totalPages = Math.ceil(total / 15);
+
+	// Filtros aplicados en cliente sobre el resultado del fetch.
+	// search filtra por email (case-insensitive); los selects filtran por
+	// rol y estado. "ALL" significa sin filtro para ese eje.
+	const filteredUsers = users.filter((u) => {
+		if (search && !u.email.toLowerCase().includes(search.toLowerCase())) {
+			return false;
+		}
+		if (roleFilter !== "ALL" && !u.roles.includes(roleFilter)) {
+			return false;
+		}
+		if (statusFilter !== "ALL" && u.isActive !== (statusFilter === "active")) {
+			return false;
+		}
+		return true;
+	});
 
 	const openEditDialog = (user: User) => {
 		setFormData({
@@ -275,18 +299,49 @@ export const UsersPage: React.FC = () => {
 				<CardHeader className="pb-4">
 					<div className="flex items-center justify-between">
 						<CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-							Personal del Sistema ({total})
+							Personal del Sistema ({filteredUsers.length}{filteredUsers.length !== total ? ` de ${total}` : ""})
 						</CardTitle>
-						<form onSubmit={handleSearch} className="flex gap-2">
+						<form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
+							{/* Filtro por correo */}
 							<div className="relative">
 								<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
 								<Input
-									placeholder="Buscar por nombre o email..."
+									placeholder="Buscar por correo..."
 									value={searchInput}
 									onChange={(e) => setSearchInput(e.target.value)}
 									className="pl-10 w-64"
 								/>
 							</div>
+							{/* Filtro por rol */}
+							<select
+								value={roleFilter}
+								onChange={(e) =>
+									setRoleFilter(
+										e.target.value as "ALL" | "ADMINISTRATOR" | "SELLER",
+									)
+								}
+								className="h-9 px-3 rounded-lg border border-input bg-background text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+								aria-label="Filtrar por rol"
+							>
+								<option value="ALL">Todos los roles</option>
+								<option value="ADMINISTRATOR">Administrador</option>
+								<option value="SELLER">Vendedor</option>
+							</select>
+							{/* Filtro por estado */}
+							<select
+								value={statusFilter}
+								onChange={(e) =>
+									setStatusFilter(
+										e.target.value as "ALL" | "active" | "inactive",
+									)
+								}
+								className="h-9 px-3 rounded-lg border border-input bg-background text-sm font-medium cursor-pointer hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+								aria-label="Filtrar por estado"
+							>
+								<option value="ALL">Todos los estados</option>
+								<option value="active">Activos</option>
+								<option value="inactive">Inactivos</option>
+							</select>
 							<Button type="submit" variant="secondary" size="sm">
 								Buscar
 							</Button>
@@ -308,7 +363,7 @@ export const UsersPage: React.FC = () => {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border/50">
-								{users.map((u) => (
+								{filteredUsers.map((u) => (
 									<tr key={u.id} className="bg-transparent hover:bg-muted/20">
 										<td className="px-6 py-4">
 											<div className="flex items-center gap-3">
@@ -394,7 +449,7 @@ export const UsersPage: React.FC = () => {
 										</td>
 									</tr>
 								))}
-								{users.length === 0 && (
+								{filteredUsers.length === 0 && (
 									<tr>
 										<td
 											colSpan={6}
